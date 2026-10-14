@@ -1,0 +1,28 @@
+{
+  "name": "prime-launcher",
+  "productName": "Prime Launcher",
+  "version": "0.3.5",
+  "description": "Prime Launcher - First Arabic Minecraft Launcher",
+  "main": "main.js",
+  "author": "GMU Studio",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/core.test.js",
+    "test:ui": "node test/ui.test.js",
+    "dist": "electron-builder --win --x64 --publish never",
+    "dist:dir": "electron-builder --win --dir --publish never"
+  },
+  "dependencies": { "adm-zip": "0.5.16" },
+  "devDependencies": { "electron": "33.2.1", "electron-builder": "25.1.8", "jsdom": "24.1.1" },
+  "build": {
+    "appId": "net.gmu.primelauncher",
+    "productName": "Prime Launcher",
+    "copyright": "© GMU Studio",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "core/**", "renderer/**", "package.json"],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }], "icon": "build/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "artifactName": "PrimeLauncher-Setup-${version}.${ext}" },
+    "portable": { "artifactName": "PrimeLauncher-Portable-${version}.${ext}" }
+  }
+}
