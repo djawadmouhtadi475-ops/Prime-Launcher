@@ -16,6 +16,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Inject CurseForge key (GitHub secret CF_API_KEY)
+        shell: bash
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
       - run: npm test
       - run: npm run dist
         env:
