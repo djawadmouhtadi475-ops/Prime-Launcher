@@ -1,8 +1,10 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function A(c, ...a) { const r = await api.invoke(c, ...a); if (!r.ok) throw new Error(r.error); return r.data; }
-const S = { cfg: null, info: { version: '0.3.5' }, view: 'home', insts: [], cur: null, tab: 'overview', td: null, vers: [], news: [], skins: [], run: {}, logs: {}, anim: true, ws: 0, wname: '',
-  br: { src: 'modrinth', type: 'mod', q: '', res: null, inst: '', busy: false }, vfilter: 'release' };
+const S = { cfg: null, info: { version: '0.3.7' }, view: 'home', insts: [], cur: null, tab: 'overview', td: null, vers: [], news: [], skins: [], run: {}, logs: {}, anim: true, ws: 0, wname: '',
+  br: { src: 'modrinth', type: 'mod', q: '', res: null, inst: '', busy: false }, vfilter: 'release', sel: null, page: null, cdir: '', cicon: null, ciconUrl: null, createVer: null };
+const T0 = Date.now();
+const ART = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map(n => `assets/art/${n}.jpg`);
 const LINKS = { site: 'https://primelauncherar.netlify.app/', discord: 'https://discord.gg/Dtwcwhhv4j', youtube: 'https://www.youtube.com/@PrimeLauncher' };
 const ACCENTS = { green: '#2fd480', yellow: '#f6c945', orange: '#ff9a3d', blue: '#4aa3ff', brown: '#b98152', red: '#ff5d5d', pink: '#ff78b4', purple: '#a971ff' };
 const THEMES = ['system', 'auto', 'light', 'dark', 'oled'];
@@ -59,12 +61,17 @@ const instCard = i => `<div class="card h inst" data-a="open" data-id="${esc(i.i
 <div class="mu sm">${esc(i.mc)} · ${t('l_' + i.loader.type)}${i.loader.version ? ' ' + esc(i.loader.version) : ''}</div><div class="mu sm">${i.lastPlayed ? fmtD(i.lastPlayed) : t('never')}</div></div>
 <button class="btn p sm" data-a="play" data-id="${esc(i.id)}">▶</button></div>`;
 
+const instSub = i => `${esc(i.mc)}${i.loader.type !== 'vanilla' ? ' · ' + t('l_' + i.loader.type) + (i.loader.version ? ' ' + esc(i.loader.version) : '') : ''}`;
+const selInst = () => S.insts.find(i => i.id === S.sel) || S.insts[0];
 function vHome() {
-  const a = acct(), last = S.insts[0], rel = S.vers.filter(v => v.type === 'release').slice(0, 6), snap = S.vers.find(v => v.type === 'snapshot');
-  return `<div class="hero"><div style="position:relative"><h1>${t('welcome')}${a ? '، ' + esc(a.name) : ''}</h1><p class="mu">${t('tagline')}</p></div>
-  <div style="position:relative">${last ? `<div class="mu sm" style="margin-bottom:6px">${t('continue')}: <b>${esc(last.name)}</b></div><button class="btn p big" data-a="play" data-id="${esc(last.id)}">▶ ${t('play')}</button>` : `<button class="btn p big" data-a="newInst">＋ ${t('newInst')}</button>`}</div></div>
-  <h2>${t('releases')}</h2><div class="grid">${(snap ? [snap] : []).concat(rel).map(v => `<div class="card h"><div class="row"><b class="grow">${esc(v.id)}</b><span class="tag ${v.type === 'release' ? 'ac' : ''}">${t('f_' + v.type)}</span></div><div class="mu sm" style="margin:4px 0 12px">${fmtD(v.date)}</div><button class="btn sm" data-a="quick" data-v="${esc(v.id)}">＋ ${t('newInst')}</button></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${S.remote ? t('newsOff') : t('loading')}</div>`}</div>
-  <h2>${t('news')}</h2><div class="grid news">${S.news.map(n => `<div class="card h">${n.image ? `<img src="${esc(n.image)}" alt="" loading="lazy">` : ''}<div class="row"><b class="grow">${esc(n.title)}</b></div><div class="mu sm" style="margin:4px 0">${esc(n.version || '')} · ${fmtD(n.date)}</div><p class="sm mu">${esc(n.text).slice(0, 160)}</p></div>`).join('') || `<div class="empty">${t('newsOff')}</div>`}</div>`;
+  const a = acct(), cur = selInst(), rel = S.vers.filter(v => v.type === 'release').slice(0, 6), snap = S.vers.find(v => v.type === 'snapshot'), el = ((Date.now() - T0) / 1000) % 48;
+  const menu = `<div class="selmenu" id="selmenu">${S.insts.map(i => `<button class="mi ${cur && i.id === cur.id ? 'on' : ''}" data-a="selPick" data-id="${esc(i.id)}">${instIcon(i)}<div><b>${esc(i.name)}</b><small>${instSub(i)}</small></div></button>`).join('')}<button class="mi" data-a="newInst"><div class="ic">＋</div><div><b>${t('newInst')}</b></div></button></div>`;
+  return `<div class="stage"><div class="slides">${ART.map((u, i) => `<div class="sl" style="animation-delay:${(i * 8 - el).toFixed(2)}s;background-image:url('${u}')"></div>`).join('')}</div>
+  <div class="tx"><h1>${t('welcome')}${a ? '، ' + esc(a.name) : ''}</h1><p>${t('tagline')}</p></div>
+  <div class="bar2"><div class="selwrap">${menu}<button class="sel" data-a="selToggle">${cur ? instIcon(cur) + `<div><b>${esc(cur.name)}</b><small>${instSub(cur)}</small></div>` : `<div class="ic">＋</div><div><b>${t('newInst')}</b></div>`}<span>▾</span></button></div>
+  ${cur ? `<button class="btn p play" data-a="play" data-id="${esc(cur.id)}">${t('play')}</button>` : `<button class="btn p play" data-a="newInst">＋ ${t('newInst')}</button>`}</div></div>
+  <h2>${t('news')}</h2><div class="grid news">${S.news.map((n, k) => `<div class="card h"><img class="nimg" src="${esc(n.image || ART[k % ART.length])}" alt="" loading="lazy"><div class="row"><b class="grow">${esc(n.title)}</b></div><div class="mu sm" style="margin:4px 0">${esc(n.version || '')} · ${fmtD(n.date)}</div><p class="sm mu">${esc(n.text).slice(0, 160)}</p></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${S.remote ? t('newsOff') : t('loading')}</div>`}</div>
+  <h2>${t('releases')}</h2><div class="grid">${(snap ? [snap] : []).concat(rel).map(v => `<div class="card h"><div class="row"><b class="grow">${esc(v.id)}</b><span class="tag ${v.type === 'release' ? 'ac' : ''}">${t('f_' + v.type)}</span></div><div class="mu sm" style="margin:4px 0 12px">${fmtD(v.date)}</div><button class="btn sm" data-a="quick" data-v="${esc(v.id)}">＋ ${t('newInst')}</button></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${S.remote ? t('newsOff') : t('loading')}</div>`}</div>`;
 }
 function vLibrary() {
   return `<div class="row"><h1 class="grow">${t('library')}</h1><button class="btn p" data-a="newInst">＋ ${t('newInst')}</button></div>
@@ -165,13 +172,14 @@ function render() {
   if (S.cfg.first) { app.innerHTML = vWelcome(); return; }
   const nav = [['home', 'home'], ['library', 'library'], ['browse', 'browse'], ['skins', 'skins'], ['settings', 'settings']], a = acct();
   const v = S.cur ? vInst() : { home: vHome, library: vLibrary, browse: vBrowse, skins: vSkins, settings: vSettings }[S.view]();
-  const mainEl = $('#mainv'), keep = mainEl ? mainEl.scrollTop : 0;
+  const mainEl = $('#mainv'), keep = mainEl ? mainEl.scrollTop : 0, pg = S.page === 'create' ? $('.page') : null;
   app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><img src="assets/icon.svg" alt=""><div><b>Prime Launcher</b><small>${t('tagline')}</small></div></div>
   ${nav.map(([k, i]) => `<button class="nav ${!S.cur && S.view === k || S.cur && k === 'library' ? 'on' : ''}" data-a="nav" data-v="${k}">${ICONS[i]}<span>${t(k)}</span></button>`).join('')}<div class="sp"></div>
   <button class="acc" data-a="nav" data-v="settings"><img src="${avatar(a)}" alt=""><div><b>${esc(a ? a.name : t('noAcc'))}</b><small>${a ? t('acc_' + a.type) : ''}</small></div></button><div class="ver">v${esc(S.info.version)}</div></aside>
   <main id="mainv"><div class="view ${S.anim ? 'enter' : ''}">${v}</div></main></div>`;
   S.anim = false; if (S.keepScroll) { $('#mainv').scrollTop = keep; }
-  drawSkins(); if (S.tab === 'overview' && S.cur) refreshLoader('i');
+  if (S.page === 'create') { if (pg) app.appendChild(pg); else app.insertAdjacentHTML('beforeend', vCreate()); }
+  drawSkins(); if (S.tab === 'overview' && S.cur) refreshLoader('i'); if (S.page === 'create' && !pg) refreshLoader('c');
 }
 /* skins canvas */
 function drawSkins() {
@@ -206,12 +214,23 @@ async function refreshLoader(pre) {
   catch (e) { lv.innerHTML = `<option value="">${t('noLoader')}</option>`; }
   lv.dataset.cur = '';
 }
-function newModal(v) {
-  S.vfilter = v && S.vers.find(x => x.id === v && x.type !== 'release') ? 'all' : 'release';
-  modal(`<h2 style="margin-top:0">${t('newInst')}</h2><label class="f">${t('name')}</label><input type="text" id="n-name" maxlength="40" placeholder="${t('myInst')}">
-  <label class="f">${t('version')}</label><div class="row">${segFilter(S.vfilter, 'n-filter')}<select id="n-ver" class="grow" style="flex:1" data-c="loaderRefresh" data-pre="n">${verOptions(S.vfilter, v)}</select></div>
-  <label class="f">${t('loader')}</label><div class="row"><select id="n-loader" style="flex:1" data-c="loaderRefresh" data-pre="n">${loaderOpts('vanilla')}</select><select id="n-lver" style="flex:1" disabled><option value="">—</option></select></div>
-  <div class="row" style="margin-top:20px;justify-content:flex-end"><button class="btn" data-a="closeModal">${t('cancel')}</button><button class="btn p" data-a="createInst">${t('create')}</button></div>`);
+function vCreate() {
+  const v = S.createVer || (S.vers.find(x => x.type === 'release') || {}).id;
+  return `<div class="page"><header>${t('createTitle')}<button class="btn sm" data-a="cancelCreate">✕</button></header><div class="body"><div class="col">
+  <div style="text-align:center"><button class="iconpick" data-a="pickIcon" id="c-icon">${S.ciconUrl ? `<img src="${esc(S.ciconUrl)}" alt="">` : '🧱'}</button><div class="mu sm" style="margin-top:6px">${t('changeIcon')}</div></div>
+  <div class="lbl">${t('name')}</div><input type="text" id="c-name" maxlength="40" placeholder="${t('myInst')}">
+  <div class="lbl"><span>${t('version')}</span>${segFilter(S.vfilter, 'c-filter')}</div><select id="c-ver" data-c="loaderRefresh" data-pre="c">${verOptions(S.vfilter, v)}</select>
+  <div class="lbl">${t('loader')}</div><div class="row" style="flex-wrap:nowrap"><select id="c-loader" style="flex:1" data-c="loaderRefresh" data-pre="c">${loaderOpts('vanilla')}</select><select id="c-lver" style="flex:1" disabled><option value="">—</option></select></div>
+  <div class="lbl">${t('gameDir')}</div><div class="row" style="flex-wrap:nowrap"><input type="text" id="c-dir" style="flex:1" readonly placeholder="${t('defaultDir')}" value="${esc(S.cdir)}"><button class="btn" data-a="pickDir">${t('browse')}</button></div>
+  <div class="lbl">${t('resolution')}</div><div class="row" style="flex-wrap:nowrap"><input type="text" id="c-w" placeholder="${t('auto')}"><span>×</span><input type="text" id="c-h" placeholder="${t('auto')}"></div>
+  <div class="lbl" style="cursor:pointer" data-a="moreToggle"><span>${t('moreOptions')} ▾</span></div>
+  <div class="more" id="c-more"><div class="lbl">${t('ram')}: <b id="cramv">${S.cfg.ram}</b> MB</div><input type="range" id="c-ram" min="1024" max="16384" step="256" value="${S.cfg.ram}" data-c="cramv">
+  <div class="lbl">${t('javaPath')}</div><input type="text" id="c-java" placeholder="${t('auto')}"><div class="lbl">${t('jvmArgs')}</div><input type="text" id="c-jvm" placeholder="-XX:+UseG1GC"></div>
+  </div></div><footer><button class="btn" data-a="cancelCreate">${t('cancel')}</button><button class="btn p" data-a="createInst">${t('create')}</button></footer></div>`;
+}
+function openCreate(v) {
+  S.page = 'create'; S.cdir = ''; S.cicon = null; S.ciconUrl = null; S.createVer = v || null;
+  S.vfilter = v && S.vers.find(x => x.id === v && x.type !== 'release') ? 'all' : 'release'; closeModal(); render();
 }
 async function play(id) {
   if (S.run[id]) return; S.run[id] = { stage: 'java', pct: 0 }; renderDock();
@@ -234,7 +253,11 @@ function instForm(pre) { const g = id => $('#' + pre + '-' + id); return { ver: 
 /* actions */
 const ACT = {
   nav: d => { S.view = d.v; S.cur = null; S.anim = true; if (d.v === 'library') refresh().then(render); else render(); },
-  closeModal, link: d => A('shell:open', d.u), newInst: () => newModal(), quick: d => newModal(d.v),
+  closeModal, link: d => A('shell:open', d.u), newInst: () => openCreate(), quick: d => openCreate(d.v),
+  selToggle: () => $('#selmenu').classList.toggle('open'), selPick: d => { S.sel = d.id; render(); },
+  cancelCreate: () => { S.page = null; render(); }, moreToggle: () => $('#c-more').classList.toggle('open'),
+  pickIcon: async () => { const r = await A('pick:image'); if (r) { S.cicon = r.path; S.ciconUrl = r.url; const im = document.createElement('img'); im.src = r.url; $('#c-icon').replaceChildren(im); } },
+  pickDir: async () => { const r = await A('pick:dir'); if (r) { S.cdir = r; $('#c-dir').value = r; } },
   lang: async d => { S.cfg = await A('cfg:set', { lang: d.v }); render(); },
   theme: async d => { S.cfg = await A('cfg:set', { theme: d.v }); render(); },
   accent: async d => { S.cfg = await A('cfg:set', { accent: d.v }); render(); },
@@ -242,8 +265,10 @@ const ACT = {
   wsOff: async () => { S.wname = $('#off-name').value; S.cfg = await A('acct:offline', S.wname); S.ws = 2; render(); },
   wsFinish: async () => { S.cfg = await A('cfg:set', { first: false }); S.anim = true; render(); },
   createInst: async () => {
-    const f = instForm('n'); const inst = await A('inst:create', { name: $('#n-name').value, mc: f.ver, loader: f.loader });
-    closeModal(); await refresh(); S.view = 'library'; S.cur = inst.id; S.tab = 'overview'; S.td = null; S.anim = true; render(); toast(t('created'));
+    const f = instForm('c'); if (!f.ver) return toast(t('loading'), 'err');
+    const g = id => $('#c-' + id).value.trim(), ram = +$('#c-ram').value;
+    const inst = await A('inst:create', { name: g('name'), mc: f.ver, loader: f.loader, gameDir: S.cdir, iconPath: S.cicon, res: { w: +g('w') || 0, h: +g('h') || 0 }, ram: ram === S.cfg.ram ? 0 : ram, javaPath: g('java'), jvmArgs: g('jvm') });
+    S.page = null; await refresh(); S.sel = inst.id; S.view = 'home'; S.cur = null; S.anim = true; render(); toast(t('created'));
   },
   open: async d => { S.cur = d.id; S.tab = 'overview'; S.td = null; S.anim = true; render(); },
   tab: async d => { S.tab = d.t; render(); await loadTab(); render(); },
@@ -286,11 +311,12 @@ const ACT = {
   javaList: async () => { const L = await A('java:list'); modal(`<h2 style="margin-top:0">Java</h2>${L.map(j => `<div class="li"><b>Java ${j.major}</b><span class="mu sm">${esc(j.path)}</span></div>`).join('') || `<div class="empty">${t('empty')}</div>`}<div style="text-align:end;margin-top:12px"><button class="btn p" data-a="closeModal">${t('close')}</button></div>`); }
 };
 const CHG = {
-  vfilter: el => { S.vfilter = el.value; const v = $('#n-ver') || $('#i-ver'); if (v) { v.innerHTML = verOptions(el.value, v.value); refreshLoader(v.dataset.pre); } },
-  loaderRefresh: el => refreshLoader(el.dataset.pre), ramv: el => { $('#ramv').textContent = el.value; },
+  vfilter: el => { S.vfilter = el.value; const v = $('#c-ver') || $('#i-ver'); if (v) { v.innerHTML = verOptions(el.value, v.value); refreshLoader(v.dataset.pre); } },
+  loaderRefresh: el => refreshLoader(el.dataset.pre), ramv: el => { $('#ramv').textContent = el.value; }, cramv: el => { $('#cramv').textContent = el.value; },
   brInst: el => { S.br.inst = el.value; }
 };
 document.addEventListener('click', async e => {
+  if (!e.target.closest('.selwrap')) { const m = $('#selmenu'); if (m) m.classList.remove('open'); }
   const ov = e.target.closest('[data-ov]'); if (ov && e.target === ov) return closeModal();
   const b = e.target.closest('[data-a]'); if (!b || (b.type === 'checkbox' && e.type !== 'click')) return;
   if (b.tagName === 'A') e.preventDefault();
@@ -303,9 +329,9 @@ document.addEventListener('change', async e => {
     if (k.startsWith('cfg:')) { const key = k.slice(4); const v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value; S.cfg = await A('cfg:set', { [key]: v }); if (key === 'lang' || key === 'theme') render(); else applyTheme(); }
   } catch (err) { toast(errMsg(err), 'err'); }
 });
-document.addEventListener('input', e => { if (e.target.matches('[data-c="ramv"]')) CHG.ramv(e.target); if (e.target.matches('input[type=range][data-c^="cfg:"]')) { const r = $('#ramv'); if (r) r.textContent = e.target.value; } });
+document.addEventListener('input', e => { if (e.target.matches('[data-c="ramv"]')) CHG.ramv(e.target); if (e.target.matches('[data-c="cramv"]')) CHG.cramv(e.target); if (e.target.matches('input[type=range][data-c^="cfg:"]')) { const r = $('#ramv'); if (r) r.textContent = e.target.value; } });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { if ($('#modal').innerHTML) closeModal(); else if (S.page) ACT.cancelCreate(); }
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) ACT[e.target.dataset.enter]().catch(err => toast(errMsg(err), 'err'));
 });
 api.on('progress', d => { if (S.run[d.id] || d.stage === 'modpack') { S.run[d.id] = { ...(S.run[d.id] || {}), stage: d.stage, pct: d.pct, running: d.stage === 'run' ? true : S.run[d.id] && S.run[d.id].running }; if (d.stage === 'done') delete S.run[d.id]; renderDock(); } });

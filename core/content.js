@@ -1,7 +1,7 @@
 const fs = require('fs'), path = require('path');
 const AdmZip = require('adm-zip');
 const { getJSON, download, pool, mkdir, safeJoin, safeName, UA } = require('./util');
-const store = require('./store');
+const store = require('./store'), secrets = require('./secrets');
 const MR = 'https://api.modrinth.com/v2', CF = 'https://api.curseforge.com/v1';
 const DIRS = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' };
 const CFCLASS = { mod: 6, resourcepack: 12, modpack: 4471, shader: 6552 };
@@ -9,7 +9,7 @@ const CFLOADER = { forge: 1, fabric: 4, quilt: 5, neoforge: 6 };
 const enc = encodeURIComponent;
 
 async function cf(p, opt = {}) {
-  const key = store.get().cfKey;
+  const key = store.get().cfKey || secrets.cfKey;
   if (!key) throw new Error('NO_CF_KEY');
   return getJSON(CF + p, { ...opt, headers: { 'x-api-key': key, ...(opt.headers || {}) } });
 }

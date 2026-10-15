@@ -114,6 +114,16 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pl-'));
     inst.del(i.id, 'mods', 'cool.jar.disabled'); assert.strictEqual(inst.files(i.id, 'mods').length, 0);
     inst.remove(i.id); assert.strictEqual(inst.list().length, 0);
   });
+  await ok('instances: custom game directory, icon, validation', () => {
+    const gd = path.join(tmp, 'custom-game');
+    const i = inst.create({ name: 'Custom', mc: '1.20.1', gameDir: gd, res: { w: 1280, h: 720 }, ram: 3072 });
+    assert.strictEqual(inst.gdir(i.id), gd); assert(fs.existsSync(gd)); assert.strictEqual(inst.get(i.id).res.w, 1280); assert.strictEqual(inst.get(i.id).ram, 3072);
+    assert.throws(() => inst.create({ name: 'x', mc: '1.20.1', gameDir: 'relative/path' }), /INVALID_DIR/);
+    const png = path.join(tmp, 'i.png'); fs.writeFileSync(png, Buffer.from('89504e470d0a1a0a', 'hex'));
+    const j = inst.create({ name: 'Ic', mc: '1.20.1', iconPath: png }); assert(j.iconUrl && /icon\.png/.test(j.iconUrl));
+    assert.strictEqual(inst.create({ name: 'Bad', mc: '1', ram: 99999999 }).ram, 0);
+    inst.remove(i.id); assert(fs.existsSync(gd), 'custom game dir must survive instance deletion'); inst.remove(j.id);
+  });
   srv.close();
   console.log(`\n${n} passed${process.exitCode ? ' (with failures)' : ''}`);
 })();

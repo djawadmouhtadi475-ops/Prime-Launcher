@@ -4,7 +4,8 @@ const store = require('./store'), auth = require('./auth'), mc = require('./mc')
 const { mkdir, safeName } = require('./util');
 let D;
 const procs = new Map();
-const root = () => path.join(D, 'meta'), idir = id => path.join(D, 'instances', safeName(id)), gdir = id => path.join(idir(id), 'game');
+const root = () => path.join(D, 'meta'), idir = id => path.join(D, 'instances', safeName(id));
+const gdir = id => { let i = null; try { i = JSON.parse(fs.readFileSync(path.join(idir(id), 'instance.json'), 'utf8')); } catch {} return i && i.gameDir ? path.resolve(i.gameDir) : path.join(idir(id), 'game'); };
 const jf = id => path.join(idir(id), 'instance.json');
 function init(dir) { D = dir; mkdir(root()); mkdir(path.join(D, 'instances')); mkdir(path.join(D, 'skins')); }
 const dataDir = () => D;
@@ -20,12 +21,18 @@ function list() {
   return fs.readdirSync(dir).map(read).filter(Boolean).map(view).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || b.created - a.created);
 }
 function get(id) { const i = read(id); if (!i) throw new Error('Instance not found'); return i; }
-function create({ name, mc: ver, loader }) {
+function create({ name, mc: ver, loader, gameDir, res, ram, javaPath, jvmArgs, iconPath }) {
   name = String(name || '').trim().slice(0, 40) || ver;
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'instance';
   const id = slug + '-' + crypto.randomBytes(3).toString('hex');
+  let gd = '';
+  if (gameDir) { if (!path.isAbsolute(gameDir)) throw new Error('INVALID_DIR'); gd = path.resolve(gameDir); }
+  const num = (v, lo, hi) => { v = Math.round(+v || 0); return v >= lo && v <= hi ? v : 0; };
+  const i = write({ id, name, mc: ver, loader: { type: (loader && loader.type) || 'vanilla', version: (loader && loader.version) || '', id: '' }, ram: num(ram, 512, 65536), javaPath: String(javaPath || '').trim(), jvmArgs: String(jvmArgs || '').trim(),
+    res: { w: num(res && res.w, 200, 8000), h: num(res && res.h, 200, 8000) }, gameDir: gd, icon: null, created: Date.now(), lastPlayed: 0 });
   mkdir(gdir(id));
-  return view(write({ id, name, mc: ver, loader: { type: (loader && loader.type) || 'vanilla', version: (loader && loader.version) || '', id: '' }, ram: 0, javaPath: '', jvmArgs: '', res: { w: 0, h: 0 }, icon: null, created: Date.now(), lastPlayed: 0 }));
+  if (iconPath) { try { return setIcon(id, iconPath); } catch {} }
+  return view(i);
 }
 function update(id, p) {
   const i = get(id);

@@ -1,6 +1,6 @@
 const I18N = {
 ar: {
-  tagline: 'أول لانشر عربي', home: 'الرئيسية', library: 'نسخي', browse: 'استكشاف', skins: 'السكنات', settings: 'الإعدادات', about: 'حول اللانشر',
+  tagline: 'أول لانشر عربي', createTitle: 'إنشاء نسخة جديدة', gameDir: 'مجلد اللعبة', defaultDir: '<استخدم المجلد الافتراضي>', browse: 'استعراض', moreOptions: 'خيارات إضافية', e_INVALID_DIR: 'مسار المجلد غير صالح', home: 'الرئيسية', library: 'نسخي', browse: 'استكشاف', skins: 'السكنات', settings: 'الإعدادات', about: 'حول اللانشر',
   welcome: 'أهلاً', continue: 'تابع من حيث توقفت', play: 'لعب', stop: 'إيقاف', newInst: 'نسخة جديدة', releases: 'الإصدارات', news: 'الأخبار',
   loading: 'جارٍ التحميل…', newsOff: 'تعذّر تحميل الأخبار (تحقق من الإنترنت)', never: 'لم تُلعب بعد', noInst: 'لا توجد نسخ بعد — أنشئ نسختك الأولى!',
   f_release: 'مستقر', f_snapshot: 'تجريبي', f_old: 'قديم', f_all: 'الكل', f_old_beta: 'بيتا قديم', f_old_alpha: 'ألفا قديم',
@@ -29,7 +29,7 @@ ar: {
   e_NO_ACCOUNT: 'اختر حساباً أولاً من الإعدادات', e_ALREADY_RUNNING: 'النسخة تعمل بالفعل', e_LOGIN_TIMEOUT: 'انتهت مهلة تسجيل الدخول', e_NO_LOADER_VERSION: 'لا يوجد إصدار محمّل لهذه النسخة', e_RUNNING: 'أوقف اللعبة أولاً'
 },
 en: {
-  tagline: 'First Arabic Launcher', home: 'Home', library: 'Instances', browse: 'Browse', skins: 'Skins', settings: 'Settings', about: 'About',
+  tagline: 'First Arabic Launcher', createTitle: 'Create new installation', gameDir: 'Game directory', defaultDir: '<Use default directory>', browse: 'Browse', moreOptions: 'More options', e_INVALID_DIR: 'Invalid folder path', home: 'Home', library: 'Instances', browse: 'Browse', skins: 'Skins', settings: 'Settings', about: 'About',
   welcome: 'Welcome', continue: 'Continue where you left off', play: 'Play', stop: 'Stop', newInst: 'New instance', releases: 'Releases', news: 'News',
   loading: 'Loading…', newsOff: 'Could not load news (check your connection)', never: 'Never played', noInst: 'No instances yet — create your first one!',
   f_release: 'Release', f_snapshot: 'Snapshot', f_old: 'Old', f_all: 'All', f_old_beta: 'Old beta', f_old_alpha: 'Old alpha',

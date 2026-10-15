@@ -1,25 +1,31 @@
-// Electron smoke test: boots the real app, waits for the UI, saves a screenshot and exits.
+// Electron smoke test: boots the real app, drives the UI and saves screenshots.
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 require('../main.js');
+const out = n => (process.env.SHOT || '/tmp/pl-shot.png').replace('.png', '-' + n + '.png');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 app.whenReady().then(() => setTimeout(async () => {
-  const w = BrowserWindow.getAllWindows()[0];
+  const w = BrowserWindow.getAllWindows()[0], js = c => w.webContents.executeJavaScript(c);
+  const shot = async n => fs.writeFileSync(out(n), (await w.webContents.capturePage()).toPNG());
   try {
-    const info = await w.webContents.executeJavaScript('({title:document.title,dir:document.documentElement.dir,theme:document.documentElement.dataset.theme,welcome:!!document.querySelector(".wel"),api:typeof window.api,h1:(document.querySelector("h1")||{}).textContent})');
-    console.log('SMOKE', JSON.stringify(info));
-    fs.writeFileSync(process.env.SHOT || '/tmp/pl-shot.png', (await w.webContents.capturePage()).toPNG());
-    // walk the wizard through the real IPC layer
-    const r = await w.webContents.executeJavaScript('(async()=>{const a=await api.invoke("acct:offline","Steve");const v=await api.invoke("inst:list");const c=await api.invoke("cfg:set",{first:false});let bad="allowed";try{await api.invoke("nope")}catch(e){bad="blocked"}return JSON.stringify({a:a.ok,v:v.ok&&v.data.length,c:c.ok&&c.data.first,bad})})()');
-    console.log('IPC', r);
-    await w.webContents.executeJavaScript('api.invoke("cfg:set",{theme:"dark",accent:"green"})');
-    const shot = n => w.webContents.capturePage().then(i => fs.writeFileSync((process.env.SHOT || '/tmp/pl-shot.png').replace('.png', '-' + n + '.png'), i.toPNG()));
-    w.webContents.reload(); await new Promise(r => setTimeout(r, 4500));
-    console.log('HOME', await w.webContents.executeJavaScript('!!document.querySelector(".shell")'));
+    console.log('SMOKE', JSON.stringify(await js('({title:document.title,welcome:!!document.querySelector(".wel"),api:typeof window.api})')));
+    console.log('IPC', await js(`(async()=>{const r=[];r.push((await api.invoke("acct:offline","Steve")).ok);
+      r.push((await api.invoke("inst:create",{name:"Survival 1.21",mc:"1.21.1",loader:{type:"vanilla"}})).ok);
+      r.push((await api.invoke("inst:create",{name:"Fabric Mods",mc:"1.20.1",loader:{type:"fabric",version:"0.16.9"}})).ok);
+      r.push((await api.invoke("cfg:set",{first:false,theme:"dark",accent:"orange"})).ok);
+      let bad="allowed";try{await api.invoke("nope")}catch(e){bad="blocked"}return JSON.stringify({r,bad})})()`));
+    w.webContents.reload(); await sleep(4500);
+    console.log('HOME', await js('!!document.querySelector(".stage")'));
     await shot('home');
-    for (const v of ['library', 'browse', 'settings']) {
-      await w.webContents.executeJavaScript(`document.querySelector('[data-a=nav][data-v=${v}]').click()`); await new Promise(r => setTimeout(r, 700)); await shot(v);
-    }
-    await w.webContents.executeJavaScript(`document.querySelector('[data-a=about]').click()`); await new Promise(r => setTimeout(r, 500)); await shot('about');
+    await js(`document.querySelector('[data-a=selToggle]').click()`); await sleep(500); await shot('menu');
+    await js(`document.querySelector('.stage .tx').click()`);
+    await js(`document.querySelector('[data-a=newInst]') ? document.querySelector('[data-a=newInst]').click() : 0`);
+    await js(`(()=>{const b=document.querySelector('.btn.p.play');b&&b.dataset.a==='newInst'&&b.click()})()`);
+    await js(`document.querySelector('[data-a=nav][data-v=library]').click()`); await sleep(500);
+    await js(`document.querySelector('[data-a=newInst]').click()`); await sleep(900); await shot('create');
+    await js(`document.querySelector('[data-a=moreToggle]').click()`); await sleep(400); await shot('create-more');
+    await js(`document.querySelector('[data-a=cancelCreate]').click()`);
+    await js(`api.invoke("cfg:set",{lang:"en",accent:"blue"})`); w.webContents.reload(); await sleep(4000); await shot('home-en');
   } catch (e) { console.log('SMOKE-ERR', e.message); }
   app.exit(0);
 }, 4000));

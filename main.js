@@ -75,6 +75,11 @@ H('acct:select', id => { store.set({ selected: id }); return store.pub(); });
 H('acct:remove', id => { auth.remove(id); return store.pub(); });
 H('java:list', () => jv.list(path.join(inst.root(), 'runtimes')));
 H('shell:open', url => openExternal(url));
+H('pick:image', async () => {
+  const r = await dialog.showOpenDialog(win, { filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }], properties: ['openFile'] });
+  return r.canceled ? null : { path: r.filePaths[0], url: require('url').pathToFileURL(r.filePaths[0]).href };
+});
+H('pick:dir', async () => { const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] }); return r.canceled ? null : r.filePaths[0]; });
 // Skins: local library + upload to Microsoft accounts
 const skinDir = () => path.join(inst.dataDir(), 'skins');
 H('skin:list', () => store.get().skins.map(s => ({ ...s, url: require('url').pathToFileURL(path.join(skinDir(), s.file)).href })));

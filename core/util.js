@@ -1,6 +1,6 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { pipeline } = require('stream/promises'), { Readable } = require('stream');
-const VERSION = '0.3.5';
+const VERSION = '0.3.7';
 const UA = `PrimeLauncher/${VERSION} (https://primelauncherar.netlify.app)`;
 const mkdir = p => fs.mkdirSync(p, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));

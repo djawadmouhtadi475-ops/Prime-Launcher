@@ -79,3 +79,32 @@ canvas.sk{image-rendering:pixelated;background:var(--bg3);border-radius:12px}
 @keyframes slide{from{opacity:0;transform:translateX(24px)}}@keyframes grow{from{transform:scaleY(0)}}
 @keyframes float{50%{transform:translateY(-10px)}}@keyframes shine{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* official-style home */
+.stage{position:relative;height:clamp(360px,56vh,540px);border-radius:20px;box-shadow:var(--sh);border:1px solid var(--bd)}
+.stage .slides{position:absolute;inset:0;border-radius:20px;overflow:hidden;background:#000}
+.stage .sl{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;animation:slideshow 48s linear infinite both}
+.stage .slides::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,#000c 0%,#0000 55%),linear-gradient(to bottom,#0008,#0000 30%)}
+.stage .tx{position:absolute;inset-inline-start:30px;top:24px;color:#fff;text-shadow:0 2px 14px #000b;z-index:2}.stage .tx h1{font-size:30px}.stage .tx p{opacity:.85}
+.stage .bar2{position:absolute;bottom:22px;inset-inline:0;display:flex;justify-content:center;align-items:stretch;gap:12px;z-index:5}
+.selwrap{position:relative}
+.sel{display:flex;align-items:center;gap:12px;min-width:250px;height:100%;padding:8px 16px;border-radius:14px;border:1px solid #fff3;background:#000a;color:#fff;cursor:pointer;backdrop-filter:blur(8px);text-align:start;transition:all .2s var(--ease)}
+.sel:hover{border-color:var(--ac);transform:translateY(-2px)}.sel b{display:block}.sel small{display:block;color:#bbc;font-size:11px}.sel .ic,.mi .ic{width:38px;height:38px;border-radius:9px;font-size:18px}.sel>span{margin-inline-start:auto}
+.selmenu{position:absolute;bottom:calc(100% + 10px);inset-inline-start:0;width:310px;max-height:320px;overflow:auto;background:#101318f2;border:1px solid #fff2;border-radius:14px;padding:6px;display:none;z-index:9;box-shadow:var(--sh)}
+.selmenu.open{display:block;animation:pop .22s var(--ease)}
+.mi{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;border:0;background:none;color:#fff;border-radius:10px;cursor:pointer;text-align:start;transition:background .15s}
+.mi:hover{background:#ffffff1a}.mi.on{background:var(--ac2);color:var(--on)}.mi b{display:block}.mi small{display:block;opacity:.75;font-size:11px}.mi .ic{background:#ffffff18;display:grid;place-items:center;overflow:hidden}.mi .ic img{width:100%;height:100%;object-fit:cover}
+.btn.play{min-width:240px;font-size:22px;letter-spacing:2px;text-transform:uppercase;padding:14px 40px;border-radius:14px}
+.news .nimg{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--bg3)}
+/* create page */
+.page{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;animation:fade .25s}
+.page header{display:flex;align-items:center;justify-content:center;padding:18px;position:relative;font-weight:700;font-size:18px;border-bottom:1px solid var(--bd)}
+.page header button{position:absolute;inset-inline-end:18px}
+.page .body{flex:1;overflow:auto;display:flex;justify-content:center;padding:18px 20px 110px}
+.page .col{width:min(520px,100%);animation:fadeUp .4s var(--ease)}
+.page footer{position:fixed;bottom:0;inset-inline:0;padding:16px 24px;display:flex;justify-content:flex-end;gap:10px;background:var(--bg2);border-top:1px solid var(--bd)}
+.lbl{font-size:11px;letter-spacing:1px;font-weight:700;color:var(--mu);margin:18px 0 6px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase}
+.lbl select{width:auto;padding:3px 8px;font-size:12px}
+.iconpick{width:76px;height:76px;border-radius:18px;border:1px dashed var(--bd);background:var(--bg3);font-size:34px;cursor:pointer;overflow:hidden;padding:0;transition:all .2s}.iconpick:hover{border-color:var(--ac);transform:scale(1.05)}.iconpick img{width:100%;height:100%;object-fit:cover}
+.more{display:none}.more.open{display:block;animation:fadeUp .3s var(--ease)}
+@keyframes slideshow{0%{opacity:0;transform:scale(1.08)}3%{opacity:1}16.5%{opacity:1}19.5%{opacity:0;transform:scale(1)}100%{opacity:0}}
