@@ -20,7 +20,8 @@ jobs:
         shell: bash
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
-        run: node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
+        run: |
+          node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
       - run: npm test
       - run: npm run dist
         env:
