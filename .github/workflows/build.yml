@@ -1,9 +1,11 @@
 name: Build Prime Launcher (Windows)
+
 on:
   push:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: windows-latest
@@ -11,34 +13,42 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
+
       - name: Inject CurseForge key (GitHub secret CF_API_KEY)
         shell: bash
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
         run: node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
+
       - name: Fetch Arabic UI font (Tajawal, SIL OFL) into renderer/assets/fonts
         shell: bash
         continue-on-error: true
         run: |
           mkdir -p renderer/assets/fonts .fontpkg && cd .fontpkg
-          npm pack @fontsource/tajawal@5 --silent
-          tar -xzf fontsource-tajawal-*.tgz
-          for w in 400 500 700; do for s in arabic latin; do cp "package/files/tajawal-$s-$w-normal.woff2" ../renderer/assets/fonts/ || echo "missing $s $w"; done; done
+          npm pack @fontsource/tajawal@5
+          tar -xzf *.tgz
+          for w in 400 500 700; do for s in arabic latin; do cp package/files/tajawal-$s-$w-normal.woff2 ../renderer/assets/fonts/ || echo "missing $s $w"; done; done
           cp package/LICENSE ../renderer/assets/fonts/OFL-Tajawal.txt || true
           ls -la ../renderer/assets/fonts
+
       - run: npm test
+
       - run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
       - uses: actions/upload-artifact@v4
         with:
           name: PrimeLauncher-windows
           path: dist/*.exe
+
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
