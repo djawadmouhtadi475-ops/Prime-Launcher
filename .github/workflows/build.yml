@@ -4,52 +4,145 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+# يلغي أي بناء قديم لنفس الفرع عند دفع تعديل جديد
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: '0'
+  ELECTRON_CACHE: ${{ github.workspace }}\.cache\electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}\.cache\electron-builder
 
 jobs:
   build:
+    name: Build Windows installer
     runs-on: windows-latest
-    permissions:
-      contents: write
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/electron
+            .cache/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
-      - name: Inject CurseForge key (GitHub secret CF_API_KEY)
+      - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG package.json=$PKG"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Inject CurseForge key from secret CF_API_KEY
         shell: bash
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
-        run: node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
+        run: |
+          node -e "const fs=require('fs');fs.writeFileSync('core/secrets.json',JSON.stringify({cfKey:process.env.CF_API_KEY||''}))"
+          if [ -z "$CF_API_KEY" ]; then
+            echo "::warning::CF_API_KEY secret is empty - CurseForge search will need a user key"
+          fi
 
-      - name: Fetch Arabic UI font (Tajawal, SIL OFL) into renderer/assets/fonts
+      - name: Fetch Tajawal Arabic font (SIL OFL)
         shell: bash
         continue-on-error: true
         run: |
-          mkdir -p renderer/assets/fonts .fontpkg && cd .fontpkg
-          npm pack @fontsource/tajawal@5
-          tar -xzf *.tgz
-          for w in 400 500 700; do for s in arabic latin; do cp package/files/tajawal-$s-$w-normal.woff2 ../renderer/assets/fonts/ || echo "missing $s $w"; done; done
+          mkdir -p renderer/assets/fonts .fontpkg
+          cd .fontpkg
+          npm pack @fontsource/tajawal@5 --silent
+          tar -xzf fontsource-tajawal-*.tgz
+          for w in 400 500 700; do
+            for s in arabic latin; do
+              cp "package/files/tajawal-$s-$w-normal.woff2" ../renderer/assets/fonts/ || echo "missing $s $w"
+            done
+          done
           cp package/LICENSE ../renderer/assets/fonts/OFL-Tajawal.txt || true
           ls -la ../renderer/assets/fonts
 
-      - run: npm test
+      - name: Core tests
+        run: npm test
 
-      - run: npm run dist
+      - name: UI tests (jsdom)
+        run: npm run test:ui
+        continue-on-error: true
+
+      - name: Build installer and portable exe
+        run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - uses: actions/upload-artifact@v4
+      - name: Verify outputs and write checksums
+        shell: bash
+        run: |
+          VER="$(node -p "require('./package.json').version")"
+          for f in "dist/PrimeLauncher-Setup-$VER.exe" "dist/PrimeLauncher-Portable-$VER.exe"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Missing build output: $f"
+              ls -la dist
+              exit 1
+            fi
+          done
+          cd dist
+          sha256sum *.exe | tee SHA256SUMS.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: PrimeLauncher-windows
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
 
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
         with:
-          files: dist/*.exe
+          name: PrimeLauncher-windows
+          path: dist
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          fail_on_unmatched_files: true
