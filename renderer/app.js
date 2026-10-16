@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function A(c, ...a) { const r = await api.invoke(c, ...a); if (!r.ok) throw new Error(r.error); return r.data; }
-const S = { cfg: null, info: { version: '0.3.7' }, view: 'home', insts: [], cur: null, tab: 'overview', td: null, vers: [], news: [], skins: [], run: {}, logs: {}, anim: true, ws: 0, wname: '',
-  br: { src: 'modrinth', type: 'mod', q: '', res: null, inst: '', busy: false }, vfilter: 'release', sel: null, page: null, cdir: '', cicon: null, ciconUrl: null, createVer: null };
+const S = { cfg: null, info: { version: '0.4.0' }, view: 'home', insts: [], cur: null, tab: 'overview', td: null, vers: [], news: [], skins: [], run: {}, logs: {}, anim: true, ws: 0, wname: '',
+  br: { src: 'modrinth', type: 'mod', q: '', res: null, inst: '', busy: false }, vfilter: 'release', sel: null, page: null, cdir: '', cicon: null, ciconUrl: null, createVer: null, help: { cat: 'all', q: '' }, pal: { q: '', i: 0 }, palList: [] };
 const T0 = Date.now();
 const ART = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map(n => `assets/art/${n}.jpg`);
 const LINKS = { site: 'https://primelauncherar.netlify.app/', discord: 'https://discord.gg/Dtwcwhhv4j', youtube: 'https://www.youtube.com/@PrimeLauncher' };
@@ -16,6 +16,7 @@ const ICONS = {
   library: ic('<path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/>'),
   browse: ic('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
   skins: ic('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+  help: ic('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8M12 17h.01"/>'),
   settings: ic('<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>')
 };
 function errMsg(e) {
@@ -41,9 +42,25 @@ function resolvedTheme() {
   if (th === 'auto') { const h = new Date().getHours(); return h >= 7 && h < 18 ? 'light' : 'dark'; }
   return th;
 }
+const FONTS = {
+  tajawal: '"Tajawal","Segoe UI Variable","Segoe UI",Tahoma,Arial,sans-serif',
+  system: '"Segoe UI Variable","Segoe UI",Tahoma,Arial,sans-serif'
+};
+const HEX = /^#[0-9a-f]{6}$/i;
+function shade(hex, f) { const n = parseInt(hex.slice(1), 16); return '#' + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * f).toString(16).padStart(2, '0')).join(''); }
+const onColor = hex => { const n = parseInt(hex.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.55 ? '#0b0f14' : '#ffffff'; };
 function applyTheme() {
-  const r = document.documentElement;
-  r.dataset.theme = resolvedTheme(); r.dataset.accent = S.cfg.accent; r.lang = S.cfg.lang; r.dir = S.cfg.lang === 'ar' ? 'rtl' : 'ltr';
+  const r = document.documentElement, st = r.style, c = S.cfg, num = (v, d) => (v === undefined || v === null || v === '' || !Number.isFinite(+v) ? d : +v);
+  r.dataset.theme = resolvedTheme(); r.dataset.accent = c.accent; r.lang = c.lang; r.dir = c.lang === 'ar' ? 'rtl' : 'ltr';
+  st.setProperty('--font', FONTS[c.font] || FONTS.tajawal); st.setProperty('--fs', num(c.fontSize, 15) + 'px'); st.setProperty('--blur', num(c.blur, 14) + 'px');
+  st.setProperty('--r', c.rounded === false ? '4px' : '14px');
+  const img = c.bgMode === 'image' && c.bgImage ? c.bgImage : c.bgMode === 'none' ? '' : 'assets/art/a3.jpg';
+  r.dataset.bg = img ? 'on' : 'off'; r.dataset.glass = img && c.glass !== false ? '1' : '0';
+  st.setProperty('--bgimg', img ? `url("${img}")` : 'none');
+  if (HEX.test(c.primary || '')) { st.setProperty('--ac', c.primary); st.setProperty('--ac2', shade(c.primary, 0.72)); st.setProperty('--on', onColor(c.primary)); }
+  else ['--ac', '--ac2', '--on'].forEach(k => st.removeProperty(k));
+  let u = document.getElementById('usercss'); if (!u) { u = document.createElement('style'); u.id = 'usercss'; document.head.appendChild(u); }
+  if (u.textContent !== (c.customCss || '')) u.textContent = c.customCss || '';
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => S.cfg && applyTheme());
 setInterval(() => S.cfg && S.cfg.theme === 'auto' && applyTheme(), 60000);
@@ -56,6 +73,7 @@ function verOptions(filter, sel) {
 }
 const segFilter = (cur, id) => `<select id="${id}" data-c="vfilter" style="width:auto">${['release', 'snapshot', 'old', 'all'].map(f => `<option value="${f}" ${f === cur ? 'selected' : ''}>${t('f_' + f)}</option>`).join('')}</select>`;
 const loaderOpts = sel => LOADERS.map(l => `<option value="${l}" ${l === sel ? 'selected' : ''}>${t('l_' + l)}</option>`).join('');
+const visSelect = (id, sel) => `<select id="${id}">${['', 'minimize', 'keep'].map(v => `<option value="${v}" ${v === (sel || '') ? 'selected' : ''}>${t('vis_' + (v || 'default'))}</option>`).join('')}</select>`;
 const instIcon = i => `<div class="ic">${i.iconUrl ? `<img src="${esc(i.iconUrl)}" alt="">` : '🧱'}</div>`;
 const instCard = i => `<div class="card h inst" data-a="open" data-id="${esc(i.id)}">${instIcon(i)}<div class="grow" style="flex:1;min-width:0"><b>${esc(i.name)}</b>
 <div class="mu sm">${esc(i.mc)} · ${t('l_' + i.loader.type)}${i.loader.version ? ' ' + esc(i.loader.version) : ''}</div><div class="mu sm">${i.lastPlayed ? fmtD(i.lastPlayed) : t('never')}</div></div>
@@ -70,6 +88,7 @@ function vHome() {
   <div class="tx"><h1>${t('welcome')}${a ? '، ' + esc(a.name) : ''}</h1><p>${t('tagline')}</p></div>
   <div class="bar2"><div class="selwrap">${menu}<button class="sel" data-a="selToggle">${cur ? instIcon(cur) + `<div><b>${esc(cur.name)}</b><small>${instSub(cur)}</small></div>` : `<div class="ic">＋</div><div><b>${t('newInst')}</b></div>`}<span>▾</span></button></div>
   ${cur ? `<button class="btn p play" data-a="play" data-id="${esc(cur.id)}">${t('play')}</button>` : `<button class="btn p play" data-a="newInst">＋ ${t('newInst')}</button>`}</div></div>
+  ${S.info.pathWarn ? `<div class="warn"><span>⚠ ${t('pathWarn')}</span><button class="btn sm" data-a="helpGo" data-c="trouble">${t('help')}</button></div>` : ''}
   <h2>${t('news')}</h2><div class="grid news">${S.news.map((n, k) => `<div class="card h"><img class="nimg" src="${esc(n.image || ART[k % ART.length])}" alt="" loading="lazy"><div class="row"><b class="grow">${esc(n.title)}</b></div><div class="mu sm" style="margin:4px 0">${esc(n.version || '')} · ${fmtD(n.date)}</div><p class="sm mu">${esc(n.text).slice(0, 160)}</p></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${S.remote ? t('newsOff') : t('loading')}</div>`}</div>
   <h2>${t('releases')}</h2><div class="grid">${(snap ? [snap] : []).concat(rel).map(v => `<div class="card h"><div class="row"><b class="grow">${esc(v.id)}</b><span class="tag ${v.type === 'release' ? 'ac' : ''}">${t('f_' + v.type)}</span></div><div class="mu sm" style="margin:4px 0 12px">${fmtD(v.date)}</div><button class="btn sm" data-a="quick" data-v="${esc(v.id)}">＋ ${t('newInst')}</button></div>`).join('') || `<div class="empty" style="grid-column:1/-1">${S.remote ? t('newsOff') : t('loading')}</div>`}</div>`;
 }
@@ -95,7 +114,8 @@ function vTab(i) {
     <div class="row" style="margin-top:14px"><button class="btn p" data-a="saveInst" data-id="${id}">${t('save')}</button><button class="btn" data-a="icon" data-id="${id}">🖼 ${t('changeIcon')}</button></div></div>
     <div class="card"><h3>${t('java')}</h3><label class="f">${t('ram')}: <b id="ramv">${ram}</b> MB</label><input type="range" id="i-ram" min="1024" max="16384" step="256" value="${ram}" data-c="ramv">
     <label class="f">${t('javaPath')}</label><input type="text" id="i-java" value="${esc(i.javaPath)}" placeholder="${t('auto')}">
-    <label class="f">${t('jvmArgs')}</label><input type="text" id="i-jvm" value="${esc(i.jvmArgs)}" placeholder="-XX:+UseG1GC"><label class="f">${t('resolution')}</label><div class="row"><input type="text" id="i-w" value="${i.res && i.res.w || ''}" placeholder="W" style="width:90px"><span>×</span><input type="text" id="i-h" value="${i.res && i.res.h || ''}" placeholder="H" style="width:90px"></div></div>
+    <label class="f">${t('jvmArgs')}</label><input type="text" id="i-jvm" value="${esc(i.jvmArgs)}" placeholder="-XX:+UseG1GC"><label class="f">${t('resolution')}</label><div class="row"><input type="text" id="i-w" value="${i.res && i.res.w || ''}" placeholder="W" style="width:90px"><span>×</span><input type="text" id="i-h" value="${i.res && i.res.h || ''}" placeholder="H" style="width:90px"></div>
+    <label class="f">${t('visibility')}</label>${visSelect('i-vis', i.vis)}<label class="f"><input type="checkbox" id="i-demo" ${i.demo ? 'checked' : ''}> ${t('demo')}</label></div>
     <div class="card"><h3>${t('tools')}</h3><div class="row"><button class="btn" data-a="openDir" data-id="${id}" data-sub="">📂 ${t('openFolder')}</button><button class="btn" data-a="repair" data-id="${id}">🛠 ${t('repair')}</button><button class="btn" data-a="logs" data-id="${id}">📜 ${t('logs')}</button><button class="btn d" data-a="delInst" data-id="${id}">🗑 ${t('delete')}</button></div></div></div>`;
   }
   if (!td) return `<div class="empty">${t('loading')}</div>`;
@@ -126,6 +146,52 @@ function vSkins() {
   <div class="grid">${a ? `<div class="card" style="text-align:center"><canvas class="sk" width="96" height="192" data-skin="https://minotar.net/skin/${a.type === 'microsoft' ? esc(a.uuid) : encodeURIComponent(a.name)}"></canvas><div style="margin-top:8px"><b>${esc(a.name)}</b></div><div class="mu sm">${t('current')}</div></div>` : ''}
   ${S.skins.map(s => `<div class="card" style="text-align:center"><canvas class="sk" width="96" height="192" data-skin="${esc(s.url)}"></canvas><div style="margin:8px 0"><b>${esc(s.name)}</b> <span class="tag">${s.variant}</span></div><div class="row" style="justify-content:center"><button class="btn p sm" data-a="skinApply" data-id="${esc(s.id)}">${t('apply')}</button><button class="btn d sm" data-a="skinDel" data-id="${esc(s.id)}">✕</button></div></div>`).join('')}</div>`;
 }
+/* command palette (Ctrl+K) */
+const NAV = [['home', 'home'], ['library', 'library'], ['browse', 'browse'], ['skins', 'skins'], ['help', 'help'], ['settings', 'settings']];
+function palItems() {
+  const q = (S.pal.q || '').trim().toLowerCase(), L = [];
+  NAV.forEach(([k]) => L.push({ ic: ICONS[k], l: t(k), s: t('pal_page'), a: 'nav', d: { v: k } }));
+  S.insts.forEach(i => { L.push({ ic: '🧱', l: i.name, s: t('pal_open'), a: 'open', d: { id: i.id } }); L.push({ ic: '▶', l: `${t('play')} — ${i.name}`, s: instSub(i), a: 'play', d: { id: i.id } }); }); // opening comes first: a stray Enter must never start the game
+  L.push({ ic: '＋', l: t('newInst'), s: '', a: 'newInst', d: {} }, { ic: '🌓', l: t('pal_theme'), s: '', a: 'themeToggle', d: {} }, { ic: '🌐', l: t('pal_lang'), s: '', a: 'langToggle', d: {} }, { ic: '📋', l: t('diagCopy'), s: '', a: 'diagCopy', d: {} });
+  return L.filter(x => !q || (x.l + ' ' + x.s).toLowerCase().includes(q)).slice(0, 12);
+}
+function palDraw() {
+  S.palList = palItems(); S.pal.i = Math.min(S.pal.i, Math.max(0, S.palList.length - 1));
+  const el = $('#pal-list'); if (!el) return;
+  el.innerHTML = S.palList.map((x, n) => `<button class="pi ${n === S.pal.i ? 'on' : ''}" data-a="palRun" data-n="${n}"><span class="pic">${x.ic}</span><span class="grow"><b>${esc(x.l)}</b>${x.s ? `<small>${x.s}</small>` : ''}</span></button>`).join('') || `<div class="empty">${t('pal_empty')}</div>`;
+  const on = el.querySelector('.pi.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+}
+function openPal() { S.pal = { q: '', i: 0 }; modal(`<input type="search" id="pal-q" placeholder="${t('palHint')}" autocomplete="off"><div id="pal-list" class="pl"></div>`, 'pal'); palDraw(); const q = $('#pal-q'); if (q) q.focus(); }
+/* help center */
+const HELP_CATS = ['all', 'start', 'accounts', 'java', 'mods', 'servers', 'trouble', 'faq'];
+const rich = s => esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="#" class="lnk" data-a="link" data-u="$2">$1</a>');
+function richBlock(lines) {
+  let out = '', ul = false;
+  for (const l of lines) {
+    const li = l.startsWith('- ');
+    if (li && !ul) { out += '<ul>'; ul = true; } else if (!li && ul) { out += '</ul>'; ul = false; }
+    out += li ? `<li>${rich(l.slice(2))}</li>` : `<p>${rich(l)}</p>`;
+  }
+  return out + (ul ? '</ul>' : '');
+}
+const helpList = () => HELP[S.cfg.lang] || HELP.en;
+const helpMatch = (a, cat, q) => (cat === 'all' || a.c === cat) && (!q || (a.q + ' ' + a.a.join(' ')).toLowerCase().includes(q.trim().toLowerCase()));
+function helpApply() {
+  const els = [...document.querySelectorAll('details.hq')]; let n = 0;
+  els.forEach(d => { const a = helpList()[+d.dataset.n], ok = helpMatch(a, S.help.cat, S.help.q); d.hidden = !ok; if (ok) n++; });
+  const e = $('#help-empty'); if (e) e.hidden = n > 0;
+}
+function vHelp() {
+  const H = helpList(), hq = S.help, n = H.filter(a => helpMatch(a, hq.cat, hq.q)).length;
+  return `<div class="row"><div class="grow"><h1>${t('help')}</h1><p class="mu">${t('helpSub')}</p></div></div>
+  <div class="card" style="margin:16px 0"><input type="search" id="help-q" placeholder="${t('helpSearch')}" value="${esc(hq.q)}" autocomplete="off">
+  <div class="chips">${HELP_CATS.map(c => `<button class="${hq.cat === c ? 'on' : ''}" data-a="helpCat" data-v="${c}">${t('hc_' + c)}</button>`).join('')}</div></div>
+  <div class="card" style="padding:0">${H.map((a, i) => `<details class="hq" data-n="${i}" ${helpMatch(a, hq.cat, hq.q) ? '' : 'hidden'}><summary>${esc(a.q)}</summary><div class="ha">${richBlock(a.a)}</div></details>`).join('')}
+  <div class="empty" id="help-empty" ${n ? 'hidden' : ''}>${t('helpEmpty')}</div></div>
+  <div class="card" style="margin-top:16px"><h3>🛠 ${t('diag')}</h3><p class="mu sm" style="margin-bottom:12px">${t('diagSub')}</p>
+  <div class="row"><button class="btn p" data-a="diagCopy">📋 ${t('diagCopy')}</button><button class="btn" data-a="diagLogs">📜 ${t('diagLogs')}</button><button class="btn" data-a="diagData">📂 ${t('diagData')}</button></div>
+  <p class="mu sm" style="margin-top:14px">${t('moreHelp')} <a href="#" class="lnk" data-a="link" data-u="${LINKS.discord}">Discord</a></p></div>`;
+}
 function vSettings() {
   const c = S.cfg;
   return `<h1>${t('settings')}</h1><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr));margin-top:18px">
@@ -133,12 +199,20 @@ function vSettings() {
   <label class="f">${t('theme')}</label><div class="seg">${THEMES.map(x => `<button class="${c.theme === x ? 'on' : ''}" data-a="theme" data-v="${x}">${t('th_' + x)}</button>`).join('')}</div>
   <label class="f">${t('accent')}</label><div class="sw">${Object.entries(ACCENTS).map(([k, v]) => `<button class="${c.accent === k ? 'on' : ''}" data-a="accent" data-v="${k}" style="background:${v}" title="${t('ac_' + k)}"></button>`).join('')}</div>
   <label class="f"><input type="checkbox" data-c="cfg:closeOnLaunch" ${c.closeOnLaunch ? 'checked' : ''}> ${t('minimize')}</label></div>
+  <div class="card" id="ui-card"><h3>${t('ui')}</h3>
+  <label class="f">${t('font')}</label><select data-c="cfg:font"><option value="tajawal" ${c.font !== 'system' ? 'selected' : ''}>${t('font_tajawal')}</option><option value="system" ${c.font === 'system' ? 'selected' : ''}>${t('font_system')}</option></select>
+  <label class="f">${t('fontSize')}: <b id="v-fontSize">${c.fontSize || 15}</b> px</label><input type="range" min="12" max="20" step="1" value="${c.fontSize || 15}" data-c="cfg:fontSize">
+  <label class="f">${t('bg')}</label><div class="row" style="flex-wrap:nowrap"><select data-c="cfg:bgMode" style="flex:1"><option value="art" ${c.bgMode !== 'none' && c.bgMode !== 'image' ? 'selected' : ''}>${t('bg_art')}</option><option value="none" ${c.bgMode === 'none' ? 'selected' : ''}>${t('bg_none')}</option><option value="image" ${c.bgMode === 'image' ? 'selected' : ''}>${t('bg_image')}</option></select><button class="btn" data-a="pickBg">${t('pickBg')}</button></div>
+  <label class="f">${t('blur')}: <b id="v-blur">${c.blur === undefined ? 14 : c.blur}</b> px</label><input type="range" min="0" max="40" step="1" value="${c.blur === undefined ? 14 : c.blur}" data-c="cfg:blur">
+  <label class="f"><input type="checkbox" data-c="cfg:glass" ${c.glass !== false ? 'checked' : ''}> ${t('glass')}</label><label class="f"><input type="checkbox" data-c="cfg:rounded" ${c.rounded !== false ? 'checked' : ''}> ${t('rounded')}</label>
+  <label class="f">${t('primary')}</label><div class="row"><input type="color" data-c="cfg:primary" value="${HEX.test(c.primary || '') ? c.primary : ACCENTS[c.accent] || '#2fd480'}" style="width:54px;height:34px;padding:2px"><button class="btn sm" data-a="primaryReset">${t('resetColor')}</button></div>
+  <label class="f">${t('customCss')}</label><textarea rows="4" data-c="cfg:customCss" spellcheck="false" dir="ltr" style="font:12px Consolas,monospace" placeholder=".card { border-radius: 8px; }">${esc(c.customCss || '')}</textarea></div>
   <div class="card"><h3>${t('java')}</h3><label class="f"><input type="checkbox" data-c="cfg:autoJava" ${c.autoJava ? 'checked' : ''}> ${t('autoJava')}</label>
   <label class="f">${t('ram')}: <b id="ramv">${c.ram}</b> MB</label><input type="range" min="1024" max="16384" step="256" value="${c.ram}" data-c="cfg:ram">
   <label class="f">${t('javaPath')}</label><input type="text" value="${esc(c.javaPath)}" data-c="cfg:javaPath" placeholder="${t('auto')}"><label class="f">${t('jvmArgs')}</label><input type="text" value="${esc(c.jvmArgs)}" data-c="cfg:jvmArgs">
   <div style="margin-top:12px"><button class="btn sm" data-a="javaList">${t('detectJava')}</button></div></div>
   <div class="card"><h3>${t('accounts')}</h3>${c.accounts.map(a => `<div class="li" style="padding:8px 0"><img src="${avatar(a)}" width="30" height="30" style="border-radius:6px;image-rendering:pixelated" alt=""><div class="t"><b>${esc(a.name)}</b><span class="mu sm">${t('acc_' + a.type)}</span></div>${a.id === c.selected ? `<span class="tag ac">✓</span>` : `<button class="btn sm" data-a="acctSel" data-id="${esc(a.id)}">${t('use')}</button>`}<button class="btn sm d" data-a="acctDel" data-id="${esc(a.id)}">✕</button></div>`).join('') || `<p class="mu">${t('noAcc')}</p>`}
-  <label class="f">${t('offlineName')}</label><div class="row"><input type="text" id="off-name" class="grow" style="flex:1" maxlength="16" data-enter="acctOff"><button class="btn" data-a="acctOff">${t('add')}</button></div>
+  <label class="f">${t('offlineName')}</label><div class="row"><input type="text" id="off-name" class="grow" style="flex:1" maxlength="16" data-enter="acctOff"><button class="btn" data-a="acctOff">${t('add')}</button></div><p class="mu sm" style="margin-top:6px">${t('offlineNote')}</p>
   <div style="margin-top:12px"><button class="btn p" data-a="acctMs">${t('msLogin')}</button></div>
   <label class="f">${t('msClient')} <a href="#" data-a="link" data-u="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app" style="color:var(--ac)">?</a></label><input type="text" value="${esc(c.msClientId)}" data-c="cfg:msClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
   <label class="f">${t('cfKey')}</label><input type="password" value="${esc(c.cfKey)}" data-c="cfg:cfKey" placeholder="$2a$10$..."></div>
@@ -159,7 +233,7 @@ function vWelcome() {
     <div class="sw" style="justify-content:center;margin-bottom:24px">${Object.entries(ACCENTS).map(([k, v]) => `<button class="${c.accent === k ? 'on' : ''}" data-a="accent" data-v="${k}" style="background:${v}"></button>`).join('')}</div>
     <button class="btn p big" data-a="wsNext">${t('next')}</button></div>`;
   else if (S.ws === 1) body = `<div class="step"><h1>${t('signIn')}</h1><p class="mu" style="margin-bottom:22px">${t('signInSub')}</p>
-    <div class="card" style="text-align:start"><h3>${t('acc_offline')}</h3><div class="row"><input type="text" id="off-name" class="grow" style="flex:1" maxlength="16" placeholder="Steve" value="${esc(S.wname)}" data-enter="wsOff"><button class="btn p" data-a="wsOff">${t('next')}</button></div></div>
+    <div class="card" style="text-align:start"><h3>${t('acc_offline')}</h3><div class="row"><input type="text" id="off-name" class="grow" style="flex:1" maxlength="16" placeholder="Steve" value="${esc(S.wname)}" data-enter="wsOff"><button class="btn p" data-a="wsOff">${t('next')}</button></div><p class="mu sm" style="margin-top:8px">${t('offlineNote')}</p></div>
     <div class="card" style="margin-top:12px;text-align:start"><h3>${t('acc_microsoft')}</h3><p class="mu sm" style="margin-bottom:10px">${t('msHint')}</p><label class="f">${t('msClient')}</label><input type="text" value="${esc(c.msClientId)}" data-c="cfg:msClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"><div style="margin-top:10px"><button class="btn" data-a="acctMs">${t('msLogin')}</button></div></div>
     <div class="row" style="justify-content:center;margin-top:16px"><button class="btn" data-a="wsBack">${t('back')}</button>${c.accounts.length ? `<button class="btn p" data-a="wsNext">${t('next')}</button>` : ''}</div></div>`;
   else body = `<div class="step"><div style="font-size:64px">🎮</div><h1>${t('ready')}</h1><p class="mu">${t('readySub')}</p><div class="row" style="justify-content:center;margin-top:24px"><button class="btn" data-a="wsBack">${t('back')}</button><button class="btn p big" data-a="wsFinish">${t('start')}</button></div></div>`;
@@ -170,13 +244,18 @@ function render() {
   applyTheme();
   const app = $('#app');
   if (S.cfg.first) { app.innerHTML = vWelcome(); return; }
-  const nav = [['home', 'home'], ['library', 'library'], ['browse', 'browse'], ['skins', 'skins'], ['settings', 'settings']], a = acct();
-  const v = S.cur ? vInst() : { home: vHome, library: vLibrary, browse: vBrowse, skins: vSkins, settings: vSettings }[S.view]();
+  const nav = [['home', 'home'], ['library', 'library'], ['browse', 'browse'], ['skins', 'skins'], ['help', 'help'], ['settings', 'settings']], a = acct();
+  const v = S.cur ? vInst() : { home: vHome, library: vLibrary, browse: vBrowse, skins: vSkins, help: vHelp, settings: vSettings }[S.view]();
   const mainEl = $('#mainv'), keep = mainEl ? mainEl.scrollTop : 0, pg = S.page === 'create' ? $('.page') : null;
-  app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><img src="assets/icon.svg" alt=""><div><b>Prime Launcher</b><small>${t('tagline')}</small></div></div>
-  ${nav.map(([k, i]) => `<button class="nav ${!S.cur && S.view === k || S.cur && k === 'library' ? 'on' : ''}" data-a="nav" data-v="${k}">${ICONS[i]}<span>${t(k)}</span></button>`).join('')}<div class="sp"></div>
-  <button class="acc" data-a="nav" data-v="settings"><img src="${avatar(a)}" alt=""><div><b>${esc(a ? a.name : t('noAcc'))}</b><small>${a ? t('acc_' + a.type) : ''}</small></div></button><div class="ver">v${esc(S.info.version)}</div></aside>
-  <main id="mainv"><div class="view ${S.anim ? 'enter' : ''}">${v}</div></main></div>`;
+  const navBtn = ([k, i]) => `<button class="nav ${!S.cur && S.view === k || S.cur && k === 'library' ? 'on' : ''}" data-a="nav" data-v="${k}" title="${t(k)}">${ICONS[i]}<span class="lb">${t(k)}</span></button>`;
+  const tile = i => `<button class="rt ${S.cur === i.id ? 'on' : ''}" data-a="open" data-id="${esc(i.id)}" title="${esc(i.name)}">${i.iconUrl ? `<img src="${esc(i.iconUrl)}" alt="">` : esc((i.name || '?').trim().charAt(0).toUpperCase())}${S.run[i.id] ? '<u></u>' : ''}</button>`;
+  app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><img src="assets/icon.svg" alt="Prime Launcher" title="Prime Launcher"></div>
+  ${nav.slice(0, 4).map(navBtn).join('')}<i class="sep"></i>
+  <div class="rail">${S.insts.slice(0, 40).map(tile).join('')}<button class="rt add" data-a="newInst" title="${t('newInst')}">＋</button></div>
+  ${nav.slice(4).map(navBtn).join('')}
+  <button class="acc" data-a="nav" data-v="settings" title="${esc(a ? a.name : t('noAcc'))}"><img src="${avatar(a)}" alt=""></button><div class="ver">v${esc(S.info.version)}</div></aside>
+  <main id="mainv"><div class="topbar"><button class="pal" data-a="palette">${ICONS.browse}<span>${t('palHint')}</span><kbd>Ctrl K</kbd></button><div class="grow"></div><button class="btn sm" data-a="themeToggle" title="${t('themeToggle')}">🌓</button></div>
+  <div class="view ${S.anim ? 'enter' : ''}">${v}</div></main></div>`;
   S.anim = false; if (S.keepScroll) { $('#mainv').scrollTop = keep; }
   if (S.page === 'create') { if (pg) app.appendChild(pg); else app.insertAdjacentHTML('beforeend', vCreate()); }
   drawSkins(); if (S.tab === 'overview' && S.cur) refreshLoader('i'); if (S.page === 'create' && !pg) refreshLoader('c');
@@ -225,7 +304,8 @@ function vCreate() {
   <div class="lbl">${t('resolution')}</div><div class="row" style="flex-wrap:nowrap"><input type="text" id="c-w" placeholder="${t('auto')}"><span>×</span><input type="text" id="c-h" placeholder="${t('auto')}"></div>
   <div class="lbl" style="cursor:pointer" data-a="moreToggle"><span>${t('moreOptions')} ▾</span></div>
   <div class="more" id="c-more"><div class="lbl">${t('ram')}: <b id="cramv">${S.cfg.ram}</b> MB</div><input type="range" id="c-ram" min="1024" max="16384" step="256" value="${S.cfg.ram}" data-c="cramv">
-  <div class="lbl">${t('javaPath')}</div><input type="text" id="c-java" placeholder="${t('auto')}"><div class="lbl">${t('jvmArgs')}</div><input type="text" id="c-jvm" placeholder="-XX:+UseG1GC"></div>
+  <div class="lbl">${t('javaPath')}</div><input type="text" id="c-java" placeholder="${t('auto')}"><div class="lbl">${t('jvmArgs')}</div><input type="text" id="c-jvm" placeholder="-XX:+UseG1GC">
+  <div class="lbl">${t('visibility')}</div>${visSelect('c-vis', '')}<div class="lbl"><label><input type="checkbox" id="c-demo"> ${t('demo')}</label></div></div>
   </div></div><footer><button class="btn" data-a="cancelCreate">${t('cancel')}</button><button class="btn p" data-a="createInst">${t('create')}</button></footer></div>`;
 }
 function openCreate(v) {
@@ -239,8 +319,14 @@ async function play(id) {
 }
 function showLogs(id) {
   const i = S.insts.find(x => x.id === id);
-  modal(`<div class="row"><h2 class="grow" style="margin:0">${esc(i ? i.name : '')} — ${t('logs')}</h2><button class="btn sm" data-a="closeModal">✕</button></div><pre class="log" id="logbox" data-id="${esc(id)}" style="margin-top:12px">${esc((S.logs[id] || []).join(''))}</pre>`, 'w');
+  modal(`<div class="row"><h2 class="grow" style="margin:0">${esc(i ? i.name : '')} — ${t('logs')}</h2><button class="btn sm" data-a="copyLog" data-id="${esc(id)}">📋 ${t('copy')}</button><button class="btn sm" data-a="closeModal">✕</button></div><pre class="log" id="logbox" data-id="${esc(id)}" style="margin-top:12px">${esc((S.logs[id] || []).join(''))}</pre>`, 'w');
   const b = $('#logbox'); b.scrollTop = b.scrollHeight;
+  // Nothing streamed yet in this session: show the previous run saved on disk.
+  if (!(S.logs[id] || []).length) A('inst:lastlog', id).then(txt => { if (txt && !(S.logs[id] || []).length) { S.logs[id] = [txt]; const bx = $('#logbox'); if (bx && bx.dataset.id === id) { bx.textContent = txt; bx.scrollTop = bx.scrollHeight; } } }).catch(() => {});
+}
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); toast(t('copied')); }
+  catch { modal(`<h2 style="margin-top:0">${t('copyFail')}</h2><textarea readonly rows="14" style="width:100%;font-family:Consolas,monospace;font-size:12px">${esc(txt)}</textarea><div style="text-align:end;margin-top:12px"><button class="btn p" data-a="closeModal">${t('close')}</button></div>`, 'w'); }
 }
 async function msLogin() {
   try {
@@ -253,7 +339,15 @@ function instForm(pre) { const g = id => $('#' + pre + '-' + id); return { ver: 
 /* actions */
 const ACT = {
   nav: d => { S.view = d.v; S.cur = null; S.anim = true; if (d.v === 'library') refresh().then(render); else render(); },
-  closeModal, link: d => A('shell:open', d.u), newInst: () => openCreate(), quick: d => openCreate(d.v),
+  closeModal, link: d => A('shell:open', d.u),
+  palette: () => openPal(), palRun: d => { const it = S.palList[+d.n]; closeModal(); if (it) return ACT[it.a](it.d); },
+  themeToggle: async () => { S.cfg = await A('cfg:set', { theme: resolvedTheme() === 'light' ? 'dark' : 'light' }); render(); },
+  langToggle: async () => { S.cfg = await A('cfg:set', { lang: S.cfg.lang === 'ar' ? 'en' : 'ar' }); render(); },
+  pickBg: async () => { const r = await A('pick:image'); if (!r) return; S.cfg = await A('cfg:set', { bgImage: r.url, bgMode: 'image' }); render(); },
+  primaryReset: async () => { S.cfg = await A('cfg:set', { primary: '' }); render(); },
+  helpCat: d => { S.help.cat = d.v; render(); }, helpGo: d => { S.help.cat = d.c || 'all'; S.help.q = ''; S.view = 'help'; S.cur = null; S.anim = true; render(); },
+  diagCopy: async () => copyText(await A('diag:report')), diagLogs: () => A('diag:open', 'logs'), diagData: () => A('diag:open', 'data'),
+  copyLog: d => copyText((S.logs[d.id] || []).join('')), newInst: () => openCreate(), quick: d => openCreate(d.v),
   selToggle: () => $('#selmenu').classList.toggle('open'), selPick: d => { S.sel = d.id; render(); },
   cancelCreate: () => { S.page = null; render(); }, moreToggle: () => $('#c-more').classList.toggle('open'),
   pickIcon: async () => { const r = await A('pick:image'); if (r) { S.cicon = r.path; S.ciconUrl = r.url; const im = document.createElement('img'); im.src = r.url; $('#c-icon').replaceChildren(im); } },
@@ -267,7 +361,7 @@ const ACT = {
   createInst: async () => {
     const f = instForm('c'); if (!f.ver) return toast(t('loading'), 'err');
     const g = id => $('#c-' + id).value.trim(), ram = +$('#c-ram').value;
-    const inst = await A('inst:create', { name: g('name'), mc: f.ver, loader: f.loader, gameDir: S.cdir, iconPath: S.cicon, res: { w: +g('w') || 0, h: +g('h') || 0 }, ram: ram === S.cfg.ram ? 0 : ram, javaPath: g('java'), jvmArgs: g('jvm') });
+    const inst = await A('inst:create', { name: g('name'), mc: f.ver, loader: f.loader, gameDir: S.cdir, iconPath: S.cicon, res: { w: +g('w') || 0, h: +g('h') || 0 }, ram: ram === S.cfg.ram ? 0 : ram, javaPath: g('java'), jvmArgs: g('jvm'), vis: g('vis'), demo: $('#c-demo').checked });
     S.page = null; await refresh(); S.sel = inst.id; S.view = 'home'; S.cur = null; S.anim = true; render(); toast(t('created'));
   },
   open: async d => { S.cur = d.id; S.tab = 'overview'; S.td = null; S.anim = true; render(); },
@@ -275,7 +369,7 @@ const ACT = {
   play: d => play(d.id), stop: d => A('inst:kill', d.id),
   saveInst: async d => {
     const f = instForm('i'), g = id => $('#i-' + id).value;
-    await A('inst:update', d.id, { name: g('name'), mc: f.ver, loader: f.loader, ram: +g('ram'), javaPath: g('java').trim(), jvmArgs: g('jvm').trim(), res: { w: +g('w') || 0, h: +g('h') || 0 } });
+    await A('inst:update', d.id, { name: g('name'), mc: f.ver, loader: f.loader, ram: +g('ram'), javaPath: g('java').trim(), jvmArgs: g('jvm').trim(), res: { w: +g('w') || 0, h: +g('h') || 0 }, vis: g('vis'), demo: $('#i-demo').checked });
     await refresh(); render(); toast(t('saved'));
   },
   icon: async d => { const r = await A('inst:icon', d.id); if (r) { await refresh(); render(); } },
@@ -329,8 +423,13 @@ document.addEventListener('change', async e => {
     if (k.startsWith('cfg:')) { const key = k.slice(4); const v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value; S.cfg = await A('cfg:set', { [key]: v }); if (key === 'lang' || key === 'theme') render(); else applyTheme(); }
   } catch (err) { toast(errMsg(err), 'err'); }
 });
-document.addEventListener('input', e => { if (e.target.matches('[data-c="ramv"]')) CHG.ramv(e.target); if (e.target.matches('[data-c="cramv"]')) CHG.cramv(e.target); if (e.target.matches('input[type=range][data-c^="cfg:"]')) { const r = $('#ramv'); if (r) r.textContent = e.target.value; } });
+document.addEventListener('input', e => { if (e.target.id === 'help-q') { S.help.q = e.target.value; helpApply(); return; } if (e.target.matches('[data-c="ramv"]')) CHG.ramv(e.target); if (e.target.matches('[data-c="cramv"]')) CHG.cramv(e.target); if (e.target.matches('input[type=range][data-c^="cfg:"]')) { const k = e.target.dataset.c.slice(4), r = k === 'ram' ? $('#ramv') : $('#v-' + k); if (r) r.textContent = e.target.value; } if (e.target.id === 'pal-q') { S.pal.q = e.target.value; S.pal.i = 0; palDraw(); } });
 document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k' && S.cfg && !S.cfg.first) { e.preventDefault(); return $('#pal-q') ? closeModal() : openPal(); }
+  if ($('#pal-q') && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+    e.preventDefault();
+    if (e.key === 'Enter') return Promise.resolve(ACT.palRun({ n: S.pal.i })).catch(err => toast(errMsg(err), 'err')); S.pal.i = Math.max(0, Math.min(S.palList.length - 1, S.pal.i + (e.key === 'ArrowDown' ? 1 : -1))); return palDraw();
+  }
   if (e.key === 'Escape') { if ($('#modal').innerHTML) closeModal(); else if (S.page) ACT.cancelCreate(); }
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) ACT[e.target.dataset.enter]().catch(err => toast(errMsg(err), 'err'));
 });

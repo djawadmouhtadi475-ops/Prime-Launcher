@@ -5,7 +5,7 @@ const vc = new VirtualConsole(); vc.on('jsdomError', e => errors.push(e.message)
 const cfg = { first: true, lang: 'ar', theme: 'system', accent: 'green', accounts: [], selected: null, msClientId: '', cfKey: '', autoJava: true, ram: 4096, javaPath: '', jvmArgs: '', closeOnLaunch: false, skins: [] };
 let insts = [], skins = [], calls = [], releaseLaunch;
 const handlers = {
-  'cfg:get': () => ({ ...cfg }), 'app:info': () => ({ version: '0.3.7' }),
+  'cfg:get': () => ({ ...cfg }), 'app:info': () => ({ version: '0.4.0', pathWarn: true }),
   'cfg:set': p => Object.assign(cfg, p) && { ...cfg },
   'acct:offline': n => { cfg.accounts.push({ id: 'off-' + n, type: 'offline', name: n, uuid: 'u' }); cfg.selected = 'off-' + n; return { ...cfg }; },
   'acct:select': id => { cfg.selected = id; return { ...cfg }; }, 'acct:remove': id => { cfg.accounts = cfg.accounts.filter(a => a.id !== id); return { ...cfg }; },
@@ -21,7 +21,8 @@ const handlers = {
   'inst:toggle': () => true, 'inst:del': () => true, 'inst:install': () => 'a.jar', 'inst:modpack': () => ({ instance: {}, missing: [] }),
   'loader:versions': (v, t) => ['0.16.9', '0.16.8'],
   'content:search': p => [{ src: p.src, id: 'x1', title: 'Sodium', desc: 'Fast <b>x</b>', icon: 'https://x/i.png', downloads: 1500000, author: 'jelly', type: p.type, url: 'https://modrinth.com/mod/sodium' }],
-  'java:list': () => [{ path: 'C:\\java.exe', major: 17 }], 'shell:open': () => true, 'skin:add': () => true
+  'java:list': () => [{ path: 'C:\\java.exe', major: 17 }], 'shell:open': () => true, 'skin:add': () => true,
+  'inst:lastlog': () => '', 'diag:report': () => 'REPORT-TEXT Prime Launcher 0.4.0', 'diag:open': () => true
 };
 const dom = new JSDOM(fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8').replace(/<script src="[^"]+"><\/script>/g, ''), {
   runScripts: 'outside-only', pretendToBeVisual: true, url: 'file://' + path.join(__dirname, '../renderer/') + 'index.html', virtualConsole: vc
@@ -68,7 +69,7 @@ const step = async (name, fn) => { await fn(); console.log('  ✓', name); };
   });
   await step('create installation opens a full page like the official launcher (fabric)', async () => {
     await click('.btn.p.play'); assert($('.page'), 'create page'); assert(/Create new installation|إنشاء نسخة جديدة/.test($('.page header').textContent));
-    for (const id of ['#c-name', '#c-ver', '#c-loader', '#c-dir', '#c-w', '#c-h', '#c-more']) assert($(id), id);
+    for (const id of ['#c-name', '#c-ver', '#c-loader', '#c-dir', '#c-w', '#c-h', '#c-more', '#c-vis', '#c-demo']) assert($(id), id);
     await click('[data-a=moreToggle]'); assert($('#c-more').classList.contains('open'));
     await change('#c-loader', 'fabric'); await wait(30); assert($('#c-lver').options.length === 2 && !$('#c-lver').disabled);
     await change('#c-filter', 'all'); assert($$('#c-ver option').length === 3);
@@ -85,11 +86,12 @@ const step = async (name, fn) => { await fn(); console.log('  ✓', name); };
     for (const [tab, re] of [['mods', /Cool Mod/], ['worlds', /World1/], ['screenshots', null], ['resourcepacks', /Cool Mod/], ['shaderpacks', /Cool Mod/], ['overview', /JVM/]]) {
       await click(`[data-a=tab][data-t=${tab}]`); await wait(20); if (re) assert(re.test($('.view').textContent), tab);
     }
+    assert($('#i-vis') && $('#i-demo'), 'launcher visibility + demo options on the overview tab');
     assert($('.shots') === null);
   });
   await step('instance save / repair / logs modal', async () => {
     $('#i-name').value = 'Renamed'; await click('[data-a=saveInst]'); assert(/Renamed/.test($('.view').textContent));
-    await click('[data-a=repair]'); await click('[data-a=logs]'); assert($('#logbox')); listeners.log({ id: insts[0].id, text: 'hello log\n' }); assert(/hello log/.test($('#logbox').textContent)); await click('[data-a=closeModal]');
+    await click('[data-a=repair]'); await click('[data-a=logs]'); assert($('#logbox')); assert($('[data-a=copyLog]'), 'copy log button'); listeners.log({ id: insts[0].id, text: 'hello log\n' }); assert(/hello log/.test($('#logbox').textContent)); await click('[data-a=closeModal]');
   });
   await step('play shows dock, progress, running, exit', async () => {
     await click('[data-a=nav][data-v=home]'); await click('.btn.p.play'); await wait(20); assert($('#dock .dk')); listeners.progress({ id: insts[0].id, stage: 'assets', pct: 0.5 }); assert(/50%/.test($('#dock').textContent));
@@ -109,9 +111,48 @@ const step = async (name, fn) => { await fn(); console.log('  ✓', name); };
     await change('select[data-c="cfg:lang"]', 'en'); assert.strictEqual(w.document.documentElement.dir, 'ltr'); assert(/Appearance/.test($('.view').textContent));
     await click('[data-a=javaList]'); assert(/Java 17/.test($('.md').textContent)); await click('[data-a=closeModal]');
     await click('[data-a=about]'); const m = $('.md').textContent;
-    for (const s of ['0.3.7', 'egyptia26', 'djawad1', 'GMU Studio', 'GMU Launcher']) assert(m.includes(s), s);
+    for (const s of ['0.4.0', 'egyptia26', 'djawad1', 'GMU Studio', 'GMU Launcher']) assert(m.includes(s), s);
     assert($('.md img').getAttribute('src') === 'assets/logo.svg'); await click('[data-a=closeModal]');
     await change('select[data-c="cfg:lang"]', 'ar'); assert.strictEqual(w.document.documentElement.dir, 'rtl');
+  });
+  await step('home warns when the data path has non-ASCII characters and links to help', async () => {
+    await click('[data-a=nav][data-v=home]'); assert($('.warn'), 'path warning'); await click('[data-a=helpGo]');
+    assert($('details.hq') && $('.chips button.on').dataset.v === 'trouble', 'help opens on the troubleshooting category');
+  });
+  await step('help center: categories, live search, diagnostics', async () => {
+    await click('[data-a=nav][data-v=help]'); assert.strictEqual($$('details.hq').length, w.HELP.ar.length); assert(w.HELP.ar.length === w.HELP.en.length && w.HELP.ar.length >= 25);
+    await click('[data-a=helpCat][data-v=java]'); const shown = () => $$('details.hq').filter(d => !d.hidden);
+    assert(shown().length >= 3 && shown().every(d => w.HELP.ar[+d.dataset.n].c === 'java'), 'category filter');
+    await click('[data-a=helpCat][data-v=all]'); $('#help-q').value = 'fabric'; $('#help-q').dispatchEvent(new w.Event('input', { bubbles: true }));
+    assert(shown().length >= 1 && shown().length < w.HELP.ar.length && shown().every(d => /fabric/i.test(w.HELP.ar[+d.dataset.n].q + w.HELP.ar[+d.dataset.n].a.join(' '))), 'search filter');
+    $('#help-q').value = 'zzzz-nothing'; $('#help-q').dispatchEvent(new w.Event('input', { bubbles: true })); assert.strictEqual(shown().length, 0); assert(!$('#help-empty').hidden, 'empty state');
+    $('#help-q').value = ''; $('#help-q').dispatchEvent(new w.Event('input', { bubbles: true })); assert.strictEqual(shown().length, w.HELP.ar.length);
+    const first = $('details.hq .ha'); assert(first.querySelector('p, li')); assert(!/\*\*|<script/i.test($('.view').innerHTML), 'markup rendered, nothing leaks');
+    assert($('.ha a.lnk[data-u^="https://"]'), 'help links go through the allow-listed opener');
+    await click('[data-a=diagCopy]'); await wait(30); assert(/REPORT-TEXT/.test($('.md').textContent), 'report shown (clipboard fallback)'); await click('[data-a=closeModal]');
+    await click('[data-a=diagLogs]'); await click('[data-a=diagData]'); assert(calls.filter(c => c === 'diag:open').length === 2);
+    await change('select[data-c="cfg:lang"]', 'en').catch(() => {});
+  });
+  await step('0.4.0 shell: icon rail, glass theme variables, command palette (Ctrl+K)', async () => {
+    await click('[data-a=nav][data-v=home]'); const R = w.document.documentElement;
+    assert($('.side .brand img') && $('.rail') && $('.rail .rt.add') && $('.topbar .pal'), 'rail + top bar'); assert($$('.side .nav').length === 6, 'six nav buttons keep their data-a=nav');
+    assert.strictEqual(R.dataset.bg, 'on'); assert.strictEqual(R.dataset.glass, '1'); assert(R.style.getPropertyValue('--font').includes('Tajawal'), 'Arabic font stack');
+    const ev = (o) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...o }));
+    ev({ key: 'k', ctrlKey: true }); await wait(); assert($('#pal-q') && $$('.pi').length >= 6, 'palette opens'); 
+    $('#pal-q').value = 'help'; $('#pal-q').dispatchEvent(new w.Event('input', { bubbles: true })); assert($$('.pi').length >= 1 && /help|المساعدة/i.test($('.pi').textContent), 'palette filters');
+    ev({ key: 'Enter' }); await wait(30); assert(!$('#pal-q') && $('details.hq'), 'Enter runs the selected command (opens Help)');
+    ev({ key: 'k', ctrlKey: true }); await wait(); ev({ key: 'Escape' }); await wait(); assert(!$('#pal-q'), 'Esc closes the palette');
+  });
+  await step('0.4.0 interface settings: font, size, blur, background, radius, primary colour, custom CSS', async () => {
+    await click('[data-a=nav][data-v=settings]'); assert($('#ui-card'), 'interface card'); const R = w.document.documentElement;
+    await change('#ui-card select[data-c="cfg:font"]', 'system'); assert(!R.style.getPropertyValue('--font').includes('Tajawal'));
+    await change('#ui-card input[data-c="cfg:fontSize"]', '18'); assert.strictEqual(R.style.getPropertyValue('--fs'), '18px');
+    await change('#ui-card input[data-c="cfg:blur"]', '30'); assert.strictEqual(R.style.getPropertyValue('--blur'), '30px');
+    await change('#ui-card select[data-c="cfg:bgMode"]', 'none'); assert.strictEqual(R.dataset.bg, 'off'); assert.strictEqual(R.dataset.glass, '0');
+    const rd = $('#ui-card input[data-c="cfg:rounded"]'); rd.checked = false; rd.dispatchEvent(new w.Event('change', { bubbles: true })); await wait(); assert.strictEqual(R.style.getPropertyValue('--r'), '4px');
+    await change('#ui-card input[data-c="cfg:primary"]', '#a971ff'); assert.strictEqual(R.style.getPropertyValue('--ac'), '#a971ff');
+    await change('#ui-card textarea', '.card{outline:1px solid red}'); assert(/outline/.test(w.document.getElementById('usercss').textContent), 'custom css applied');
+    await click('[data-a=primaryReset]'); assert.strictEqual(R.style.getPropertyValue('--ac'), '', 'colour reset'); await click('[data-a=themeToggle]');
   });
   await step('delete instance', async () => { await click('[data-a=nav][data-v=library]'); await click('.inst'); await click('[data-a=delInst]'); assert.strictEqual(insts.length, 0); });
   const real = errors.filter(e => !/Could not load|Not implemented|navigation/i.test(e));

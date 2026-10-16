@@ -137,7 +137,7 @@ function buildArgs(root, j, o) {
     auth_session: `token:${o.account.type === 'microsoft' ? o.account.mcToken : '0'}:${o.account.uuid}`,
     resolution_width: String(o.res.w), resolution_height: String(o.res.h)
   };
-  const features = { has_custom_resolution: !!(o.res.w && o.res.h) };
+  const features = { has_custom_resolution: !!(o.res.w && o.res.h), is_demo_user: !!o.demo };
   const jvm = j.arguments ? flat(j.arguments.jvm, vars, features) : ['-Djava.library.path=' + o.natives, '-cp', cp];
   const game = j.arguments ? flat(j.arguments.game, vars, features) : subst(j.minecraftArguments || '', vars).split(' ').filter(Boolean);
   const lg = j.logging && j.logging.client;
@@ -145,6 +145,6 @@ function buildArgs(root, j, o) {
   if (!jvm.some(a => a.startsWith('-Djava.library.path'))) jvm.unshift('-Djava.library.path=' + o.natives);
   if (!jvm.includes('-cp') && !jvm.includes('-classpath')) jvm.push('-cp', cp);
   const mem = [`-Xmx${o.ram}M`, `-Xms${Math.min(512, o.ram)}M`];
-  return [...mem, ...o.jvmArgs, ...extra, ...jvm, j.mainClass, ...game, ...(o.res.w && !j.arguments ? ['--width', String(o.res.w), '--height', String(o.res.h)] : [])];
+  return [...mem, ...o.jvmArgs, ...extra, ...jvm, j.mainClass, ...game, ...(o.res.w && !j.arguments ? ['--width', String(o.res.w), '--height', String(o.res.h)] : []), ...(o.demo && !j.arguments ? ['--demo'] : [])];
 }
 module.exports = { ruleOk, mavenPath, subst, merge, manifest, loadVersion, resolveLibs, classpath, ensureVersion, extractNatives, prepareAssets, buildArgs };

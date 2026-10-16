@@ -124,6 +124,37 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pl-'));
     assert.strictEqual(inst.create({ name: 'Bad', mc: '1', ram: 99999999 }).ram, 0);
     inst.remove(i.id); assert(fs.existsSync(gd), 'custom game dir must survive instance deletion'); inst.remove(j.id);
   });
+  await ok('v0.3.9: demo mode flag, launcher visibility option, last-run log', () => {
+    const base = { account: { name: 'A', uuid: 'u', type: 'offline' }, gameDir: 'G', natives: 'N', assetsDir: 'AS', ram: 1024, res: { w: 0, h: 0 }, jvmArgs: [] };
+    const modern = { id: 'm', type: 'release', mainClass: 'M', _base: 'm', libraries: [], arguments: { jvm: ['-cp', '${classpath}'], game: ['--username', '${auth_player_name}', { rules: [{ action: 'allow', features: { is_demo_user: true } }], value: '--demo' }] } };
+    assert(!mc.buildArgs(root, modern, base).includes('--demo')); assert(mc.buildArgs(root, modern, { ...base, demo: true }).includes('--demo'));
+    const legacy = { id: 'old', type: 'release', mainClass: 'M', _base: 'old', minecraftArguments: '--username ${auth_player_name}', libraries: [], assets: 'legacy' };
+    assert(!mc.buildArgs(root, legacy, base).includes('--demo')); assert(mc.buildArgs(root, legacy, { ...base, demo: true }).includes('--demo'));
+    const i = inst.create({ name: 'Vis', mc: '1.20.1', vis: 'keep', demo: true });
+    assert.strictEqual(inst.get(i.id).vis, 'keep'); assert.strictEqual(inst.get(i.id).demo, true);
+    assert.strictEqual(inst.update(i.id, { vis: 'bogus', demo: false }).vis, ''); assert.strictEqual(inst.get(i.id).demo, false);
+    assert.strictEqual(inst.create({ name: 'Plain', mc: '1.20.1' }).vis, '');
+    assert.strictEqual(inst.lastLog(i.id), '');
+    fs.writeFileSync(path.join(path.dirname(path.join(inst.gdir(i.id))), 'last-run.log'), 'previous run\n'); assert.strictEqual(inst.lastLog(i.id), 'previous run\n');
+    inst.list().forEach(x => inst.remove(x.id));
+  });
+  await ok('v0.3.9: --workDir parsing and non-ASCII path detection', () => {
+    const wd = path.join(tmp, 'work dir');
+    assert.strictEqual(util.parseWorkDir(['electron', '.', '--workDir', wd]), wd); assert.strictEqual(util.parseWorkDir(['--workDir=' + wd]), wd);
+    assert.strictEqual(util.parseWorkDir(['--workDir', '"' + wd + '"']), wd);
+    assert.strictEqual(util.parseWorkDir(['--workDir', 'relative/dir']), '', 'relative paths are ignored'); assert.strictEqual(util.parseWorkDir([]), '');
+    assert(util.hasNonAscii('C:\\Users\\محمد')); assert(util.hasNonAscii('C:\\Users\\José')); assert(!util.hasNonAscii('C:\\Users\\Bob'));
+    assert.strictEqual(util.VERSION, require('../package.json').version);
+  });
+  await ok('v0.4.0: appearance settings are validated before being saved', () => {
+    const st = require('../core/store');
+    const c = st.sanitize({ font: 'comic', fontSize: 99, blur: -5, glass: 0, rounded: 1, bgMode: 'video', bgImage: 'javascript:alert(1)', primary: 'red', customCss: 'x'.repeat(30000), evil: 1, theme: 'dark' });
+    assert.strictEqual(c.font, 'tajawal'); assert.strictEqual(c.fontSize, 20); assert.strictEqual(c.blur, 0); assert.strictEqual(c.glass, false); assert.strictEqual(c.rounded, true);
+    assert.strictEqual(c.bgMode, 'art'); assert.strictEqual(c.bgImage, ''); assert.strictEqual(c.primary, ''); assert.strictEqual(c.customCss.length, 20000); assert(!('evil' in c)); assert.strictEqual(c.theme, 'dark');
+    const g = st.sanitize({ font: 'system', fontSize: '17', blur: 22.6, bgMode: 'image', bgImage: 'file:///C:/Users/me/Pictures/bg%20(1).png', primary: '#A971FF' });
+    assert.strictEqual(g.font, 'system'); assert.strictEqual(g.fontSize, 17); assert.strictEqual(g.blur, 23); assert.strictEqual(g.bgMode, 'image'); assert.strictEqual(g.bgImage, 'file:///C:/Users/me/Pictures/bg%20(1).png'); assert.strictEqual(g.primary, '#a971ff');
+    assert.strictEqual(st.sanitize({ bgImage: 'file:///a"b' }).bgImage, '', 'quotes are rejected so the CSS url() cannot be broken out of');
+  });
   srv.close();
   console.log(`\n${n} passed${process.exitCode ? ' (with failures)' : ''}`);
 })();

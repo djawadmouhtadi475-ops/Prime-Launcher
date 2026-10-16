@@ -1,7 +1,7 @@
 {
   "name": "prime-launcher",
   "productName": "Prime Launcher",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "description": "Prime Launcher - First Arabic Minecraft Launcher",
   "main": "main.js",
   "author": "GMU Studio",

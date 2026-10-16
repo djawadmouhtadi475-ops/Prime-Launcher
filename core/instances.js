@@ -21,7 +21,8 @@ function list() {
   return fs.readdirSync(dir).map(read).filter(Boolean).map(view).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || b.created - a.created);
 }
 function get(id) { const i = read(id); if (!i) throw new Error('Instance not found'); return i; }
-function create({ name, mc: ver, loader, gameDir, res, ram, javaPath, jvmArgs, iconPath }) {
+const VIS = v => (v === 'minimize' || v === 'keep' ? v : '');
+function create({ name, mc: ver, loader, gameDir, res, ram, javaPath, jvmArgs, iconPath, vis, demo }) {
   name = String(name || '').trim().slice(0, 40) || ver;
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'instance';
   const id = slug + '-' + crypto.randomBytes(3).toString('hex');
@@ -29,7 +30,7 @@ function create({ name, mc: ver, loader, gameDir, res, ram, javaPath, jvmArgs, i
   if (gameDir) { if (!path.isAbsolute(gameDir)) throw new Error('INVALID_DIR'); gd = path.resolve(gameDir); }
   const num = (v, lo, hi) => { v = Math.round(+v || 0); return v >= lo && v <= hi ? v : 0; };
   const i = write({ id, name, mc: ver, loader: { type: (loader && loader.type) || 'vanilla', version: (loader && loader.version) || '', id: '' }, ram: num(ram, 512, 65536), javaPath: String(javaPath || '').trim(), jvmArgs: String(jvmArgs || '').trim(),
-    res: { w: num(res && res.w, 200, 8000), h: num(res && res.h, 200, 8000) }, gameDir: gd, icon: null, created: Date.now(), lastPlayed: 0 });
+    res: { w: num(res && res.w, 200, 8000), h: num(res && res.h, 200, 8000) }, gameDir: gd, vis: VIS(vis), demo: !!demo, icon: null, created: Date.now(), lastPlayed: 0 });
   mkdir(gdir(id));
   if (iconPath) { try { return setIcon(id, iconPath); } catch {} }
   return view(i);
@@ -38,6 +39,8 @@ function update(id, p) {
   const i = get(id);
   const allowed = ['name', 'ram', 'javaPath', 'jvmArgs', 'res'];
   for (const k of allowed) if (k in p) i[k] = p[k];
+  if ('vis' in p) i.vis = VIS(p.vis);
+  if ('demo' in p) i.demo = !!p.demo;
   if (p.mc && (p.mc !== i.mc || (p.loader && (p.loader.type !== i.loader.type || p.loader.version !== i.loader.version)))) {
     i.mc = p.mc; i.loader = { type: (p.loader && p.loader.type) || 'vanilla', version: (p.loader && p.loader.version) || '', id: '' };
   }
@@ -131,17 +134,23 @@ async function launch(id, emit) {
   const assetsDir = mc.prepareAssets(R, j, gameDir);
   const args = mc.buildArgs(R, j, {
     account: acc, gameDir, natives, assetsDir, ram: i.ram || cfg.ram || 4096, res: i.res || { w: 0, h: 0 },
-    jvmArgs: `${cfg.jvmArgs || ''} ${i.jvmArgs || ''}`.split(/\s+/).filter(Boolean)
+    jvmArgs: `${cfg.jvmArgs || ''} ${i.jvmArgs || ''}`.split(/\s+/).filter(Boolean), demo: !!i.demo
   });
   emit('progress', { id, stage: 'run', pct: 1 });
   const child = spawn(java, args, { cwd: gameDir, windowsHide: true });
   procs.set(id, child);
   i.lastPlayed = Date.now(); write(i);
-  child.stdout.on('data', d => emit('log', { id, text: d.toString() }));
-  child.stderr.on('data', d => emit('log', { id, text: d.toString() }));
-  child.on('error', e => { procs.delete(id); emit('exit', { id, code: -1, error: e.message }); });
-  child.on('exit', code => { procs.delete(id); emit('exit', { id, code }); });
+  let ls = null; try { ls = fs.createWriteStream(lastLogFile(id)); ls.on('error', () => { ls = null; }); } catch {}
+  const out = d => { const text = d.toString(); if (ls) ls.write(text); emit('log', { id, text }); };
+  child.stdout.on('data', out); child.stderr.on('data', out);
+  child.on('error', e => { procs.delete(id); if (ls) ls.end('\n[launcher] ' + e.message + '\n'); emit('exit', { id, code: -1, error: e.message }); });
+  child.on('exit', code => { procs.delete(id); if (ls) ls.end('\n[launcher] exit code ' + code + '\n'); emit('exit', { id, code }); });
   return true;
+}
+const lastLogFile = id => path.join(idir(id), 'last-run.log');
+// Tail of the previous game output (kept on disk so the log survives a launcher restart).
+function lastLog(id) {
+  try { const b = fs.readFileSync(lastLogFile(id)); return b.slice(Math.max(0, b.length - 200 * 1024)).toString('utf8'); } catch { return ''; }
 }
 function kill(id) { const c = procs.get(id); if (c) c.kill(); }
 async function repair(id, emit) {
@@ -149,4 +158,4 @@ async function repair(id, emit) {
   await prepare(i, { emit, verify: true });
   emit('progress', { id, stage: 'done', pct: 1 });
 }
-module.exports = { init, dataDir, root, gdir, list, get, create, update, remove, setIcon, files, toggle, del, worlds, shots, install, installModpack, launch, kill, repair };
+module.exports = { init, dataDir, root, gdir, list, get, create, update, remove, setIcon, files, toggle, del, worlds, shots, install, installModpack, launch, kill, repair, lastLog };

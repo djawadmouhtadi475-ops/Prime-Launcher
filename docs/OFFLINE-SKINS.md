@@ -34,4 +34,4 @@ create policy "own skin write" on storage.objects for all to authenticated
 رابط السكن يصير: `https://<مشروعك>.supabase.co/storage/v1/object/public/offline-skins/{USERNAME}.png` — ضعه في حقل `skin` في إعداد CustomSkinLoader أعلاه. (يمكن إضافة زر "ارفع سكنك" في موقعك لاحقاً.)
 
 ## الطريقة 3: سيرفر سكنات كامل (حسابات + رفع من الويب)
-شغّل **Drasl** (خفيف) أو **Blessing Skin Server** على VPS/Docker، ويعملان بنظام Yggdrasil مع **authlib-injector**؛ يسجّل اللاعب ويرفع سكنه من الويب. يتطلب أن يدعم اللانشر حسابات Yggdrasil (غير موجود في 0.3.7 — يمكن إضافته).
+شغّل **Drasl** (خفيف) أو **Blessing Skin Server** على VPS/Docker، ويعملان بنظام Yggdrasil مع **authlib-injector**؛ يسجّل اللاعب ويرفع سكنه من الويب. يتطلب أن يدعم اللانشر حسابات Yggdrasil (غير موجود في 0.4.0 — يمكن إضافته).

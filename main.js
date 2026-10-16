@@ -1,13 +1,21 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
-const fs = require('fs'), path = require('path');
-const dataDir = path.join(app.getPath('appData'), 'PrimeLauncher');
+const fs = require('fs'), path = require('path'), os = require('os');
+const { VERSION, getJSON, parseWorkDir, hasNonAscii } = require('./core/util');
+// Default data folder, or the absolute path passed as `--workDir "D:\\Games\\Prime"`.
+const dataDir = parseWorkDir(process.argv) || path.join(app.getPath('appData'), 'PrimeLauncher');
 app.setPath('userData', path.join(dataDir, 'electron'));
-const { VERSION, getJSON } = require('./core/util');
 const store = require('./core/store'), auth = require('./core/auth'), inst = require('./core/instances');
 const mc = require('./core/mc'), ld = require('./core/loaders'), jv = require('./core/java'), content = require('./core/content');
 let win;
+// Launcher log (replaced when it grows past 1 MB). Never contains tokens.
+const logFile = path.join(dataDir, 'launcher.log');
+try { fs.mkdirSync(dataDir, { recursive: true }); if (fs.existsSync(logFile) && fs.statSync(logFile).size > 1048576) fs.writeFileSync(logFile, ''); } catch {}
+const log = m => { try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${m}\n`); } catch {} };
+log(`Prime Launcher ${VERSION} started (electron ${process.versions.electron})`);
+process.on('uncaughtException', e => log('uncaughtException: ' + (e && e.stack || e)));
+process.on('unhandledRejection', e => log('unhandledRejection: ' + (e && e.stack || e)));
 const emit = (c, d) => { if (win && !win.isDestroyed()) win.webContents.send(c, d); };
-const ALLOWED_HOSTS = ['discord.gg', 'www.youtube.com', 'primelauncherar.netlify.app', 'modrinth.com', 'www.curseforge.com', 'aka.ms', 'microsoft.com', 'www.microsoft.com', 'login.live.com', 'portal.azure.com', 'adoptium.net'];
+const ALLOWED_HOSTS = ['discord.gg', 'www.youtube.com', 'primelauncherar.netlify.app', 'modrinth.com', 'www.curseforge.com', 'aka.ms', 'microsoft.com', 'www.microsoft.com', 'login.live.com', 'portal.azure.com', 'adoptium.net', 'www.minecraft.net', 'mclo.gs'];
 
 function createWindow() {
   win = new BrowserWindow({
@@ -26,15 +34,23 @@ function openExternal(url) {
   if (u.protocol !== 'https:' || !ALLOWED_HOSTS.some(h => u.hostname === h || u.hostname.endsWith('.' + h))) throw new Error('Blocked URL');
   return shell.openExternal(u.href);
 }
-const H = (c, fn) => ipcMain.handle(c, async (_e, ...a) => { try { return { ok: true, data: await fn(...a) }; } catch (e) { return { ok: false, error: e.message || String(e) }; } });
+const H = (c, fn) => ipcMain.handle(c, async (_e, ...a) => { try { return { ok: true, data: await fn(...a) }; } catch (e) { log(`${c} failed: ${e && e.message || e}`); return { ok: false, error: e.message || String(e) }; } });
 
-H('app:info', () => ({ version: VERSION, dataDir, electron: process.versions.electron, node: process.versions.node }));
-H('cfg:get', () => store.pub());
-H('cfg:set', p => {
-  const ok = ['first', 'lang', 'theme', 'accent', 'msClientId', 'cfKey', 'autoJava', 'ram', 'javaPath', 'jvmArgs', 'closeOnLaunch'];
-  const clean = {}; for (const k of ok) if (k in p) clean[k] = p[k];
-  store.set(clean); return store.pub();
+H('app:info', () => ({ version: VERSION, dataDir, electron: process.versions.electron, node: process.versions.node, pathWarn: [dataDir, os.homedir(), os.tmpdir()].some(hasNonAscii) }));
+// Diagnostics: a shareable system report (no tokens, home folder masked) and quick access to logs.
+const mask = t => String(t).split(os.homedir()).join('~');
+H('diag:report', async () => {
+  const c = store.get(), a = c.accounts.find(x => x.id === c.selected);
+  let javas = []; try { javas = await jv.list(path.join(inst.root(), 'runtimes')); } catch {}
+  let tail = ''; try { tail = fs.readFileSync(logFile, 'utf8').split('\n').slice(-40).join('\n'); } catch {}
+  return mask([`Prime Launcher ${VERSION}`, `Electron ${process.versions.electron} / Node ${process.versions.node}`, `OS ${os.type()} ${os.release()} ${os.arch()}`,
+    `RAM ${Math.round(os.totalmem() / 1048576)} MB`, `Data folder: ${dataDir}`, `Account type: ${a ? a.type : 'none'}`, `Auto Java: ${c.autoJava}`,
+    `Java: ${javas.map(j => j.major + ' (' + j.path + ')').join('; ') || 'none found'}`, `Instances: ${inst.list().length}`, '--- launcher.log (tail) ---', tail].join('\n'));
 });
+H('diag:open', what => { if (what === 'logs') { if (!fs.existsSync(logFile)) fs.writeFileSync(logFile, ''); shell.showItemInFolder(logFile); return true; } return shell.openPath(dataDir); });
+H('inst:lastlog', id => inst.lastLog(id));
+H('cfg:get', () => store.pub());
+H('cfg:set', p => { store.set(store.sanitize(p || {})); return store.pub(); });
 H('mc:versions', async () => (await mc.manifest()).versions.map(v => ({ id: v.id, type: v.type, date: v.releaseTime })));
 H('mc:news', async () => {
   const base = 'https://launchercontent.mojang.com';
@@ -52,7 +68,9 @@ H('inst:icon', async id => {
 });
 H('inst:launch', async id => {
   await inst.launch(id, emit);
-  if (store.get().closeOnLaunch && win) win.minimize();
+  const i = inst.get(id), vis = i.vis || (store.get().closeOnLaunch ? 'minimize' : 'keep');
+  log(`launch ${i.mc} ${i.loader.type} (${i.id}) visibility=${vis}`);
+  if (vis === 'minimize' && win) win.minimize();
   return true;
 });
 H('inst:kill', id => inst.kill(id));

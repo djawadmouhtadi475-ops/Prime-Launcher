@@ -1,6 +1,6 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { pipeline } = require('stream/promises'), { Readable } = require('stream');
-const VERSION = '0.3.7';
+const VERSION = '0.4.0';
 const UA = `PrimeLauncher/${VERSION} (https://primelauncherar.netlify.app)`;
 const mkdir = p => fs.mkdirSync(p, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -46,5 +46,17 @@ function safeJoin(base, rel) {
   if (p !== path.resolve(base) && !p.startsWith(path.resolve(base) + path.sep)) throw new Error('Unsafe path: ' + rel);
   return p;
 }
+// `--workDir "C:\\Games\\Prime"` (or --workDir=...) moves all launcher data. Only absolute paths are accepted.
+function parseWorkDir(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = String(argv[i]); let v = '';
+    if (a.startsWith('--workDir=')) v = a.slice(10); else if (a === '--workDir') v = String(argv[i + 1] || '');
+    v = v.replace(/^"(.*)"$/, '$1').trim();
+    if (v && path.isAbsolute(v)) return path.resolve(v);
+  }
+  return '';
+}
+// Java on Windows can fail when the launcher path contains non-ASCII characters.
+const hasNonAscii = s => /[^\x00-\x7f]/.test(String(s || ''));
 const safeName = s => String(s).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 120);
-module.exports = { VERSION, UA, mkdir, sleep, getJSON, sha1, download, pool, safeJoin, safeName };
+module.exports = { VERSION, UA, mkdir, sleep, getJSON, sha1, download, pool, safeJoin, safeName, parseWorkDir, hasNonAscii };
