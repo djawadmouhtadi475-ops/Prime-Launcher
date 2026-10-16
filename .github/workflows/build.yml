@@ -20,8 +20,17 @@ jobs:
         shell: bash
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
+      - name: Fetch Arabic UI font (Tajawal, SIL OFL) into renderer/assets/fonts
+        shell: bash
+        continue-on-error: true
         run: |
-          node -e "require('fs').writeFileSync('core/secrets.json', JSON.stringify({ cfKey: process.env.CF_API_KEY || '' }))"
+          mkdir -p renderer/assets/fonts .fontpkg && cd .fontpkg
+          npm pack @fontsource/tajawal@5 --silent
+          tar -xzf fontsource-tajawal-*.tgz
+          for w in 400 500 700; do for s in arabic latin; do cp "package/files/tajawal-$s-$w-normal.woff2" ../renderer/assets/fonts/ || echo "missing $s $w"; done; done
+          cp package/LICENSE ../renderer/assets/fonts/OFL-Tajawal.txt || true
+          ls -la ../renderer/assets/fonts
       - run: npm test
       - run: npm run dist
         env:
